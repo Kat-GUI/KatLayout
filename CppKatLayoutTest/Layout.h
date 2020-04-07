@@ -19,6 +19,7 @@ public:
 	Layout *pending_top=nullptr,*pending_left=nullptr,*pending_right=nullptr,*pending_bottom=nullptr;
 	//这四个变量供绘图时使用，用来找到四个方向紧贴自己的邻居。neighbor_xxx与pending_xxx形成双向链表
 	//同时也避免计算时两个紧贴的layout形成“空岛”（A告知在B右边、B告知在A左边）造成无法计算坐标的现象
+	//哎呀写到后面我也搞不清楚哪个是哪个反正用就是了
 	Layout *neighbor_top=nullptr,*neighbor_left=nullptr,*neighbor_right=nullptr,*neighbor_bottom=nullptr;
 	//表示大小由子对象决定，pending为true时限制行为（max、min）依然有效
 	bool pending_width=false,pending_height=false;
@@ -36,101 +37,155 @@ public:
 	absRegion region;
 	//留给派生类重写
 	virtual float measureChildWidth(){
+		int val=0;
 		absRegion tmp;
 		tmp.x=tmp.y=tmp.w=tmp.h=0;
-		if(display!=nullptr)display->resetRegion(tmp);//此处计算是为了取出w
-		return display==nullptr?0:display->region.w;
+		Layout *iter=display;
+		if (iter != nullptr)
+		{
+			while (iter->neighbor_left != nullptr) 
+				iter=iter->neighbor_left;
+			while (iter != nullptr)
+			{
+				iter->resetRegion(tmp);
+				val+=iter->region.w;
+				iter=iter->neighbor_right;
+			}
+			iter = display;
+			while (iter->neighbor_top != nullptr)
+				iter = iter->neighbor_top;
+			while (iter != nullptr)
+			{
+				iter->resetRegion(tmp);
+				if(iter->region.w>val)val=iter->region.w;
+				iter = iter->neighbor_bottom;
+			}
+		}
+		return val;
 	}
 	virtual float measureChildHeight(){
+		int val = 0;
 		absRegion tmp;
 		tmp.x = tmp.y = tmp.w = tmp.h = 0;
-		if(display != nullptr)display->resetRegion(tmp);//此处计算是为了取出h
-		return display==nullptr?0:display->region.h;
+		Layout* iter = display;
+		if (iter != nullptr)
+		{
+			while (iter->neighbor_top != nullptr)
+				iter = iter->neighbor_top;
+			while (iter != nullptr)
+			{
+				iter->resetRegion(tmp);
+				val += iter->region.h;
+				iter = iter->neighbor_bottom;
+			}
+			iter = display;
+			while (iter->neighbor_left != nullptr)
+				iter = iter->neighbor_left;
+			while (iter != nullptr)
+			{
+				iter->resetRegion(tmp);
+				if(iter->region.h>val)val=iter->region.h;
+				iter = iter->neighbor_right;
+			}
+		}
+		return val;
 	}
 	void resetRegion(absRegion parent_region) {
 		//设置了宽度、高度时，直接计算w h
 		if (width != nullptr)region.w = *width;
 		else if (scale_width != nullptr)region.w = parent_region.w * (*scale_width);
 		else if (pending_width) region.w = measureChildWidth();
+	
+
+			//左右都没设置，只设置了宽，那就水平居中
+			if (pending_left == nullptr && pending_right == nullptr
+				&& left == nullptr && scale_left == nullptr && right == nullptr && scale_right == nullptr
+				&& (width != nullptr || scale_width != nullptr || pending_width)) {
+				region.x = parent_region.x + (parent_region.w - region.w) / 2;
+			}
+
+			//设置了left、scale_left或pending_left时，计算x
+			if (parent!=nullptr&&parent->pending_width&&pending_left==nullptr&&pending_right==nullptr) {
+				region.x=parent_region.x;
+			}
+			else if (pending_left != nullptr) {
+				region.x = pending_left->region.x + pending_left->region.w;
+			}
+			else if (left != nullptr) {
+				region.x = parent_region.x + *left;
+			}
+			else if (scale_left != nullptr) {
+				region.x = parent_region.x + parent_region.w * (*scale_left);
+			}
+
+			//设置了right、scale_right时，如果同时设置了width或scale_width（此时left无效），计算x；否则结合left计算w
+			//计算pending_right pending_bottom需要region.h region.w,故放在后面计算
+			if (pending_right == nullptr&&pending_left == nullptr) {
+				if (right != nullptr) {
+					if (width != nullptr || scale_width != nullptr || pending_width) {
+						region.x = parent_region.x + parent_region.w - region.w - *right;
+					}
+					else {
+						region.w = parent_region.x + parent_region.w - region.x - *right;
+					}
+				}
+				else if (scale_right != nullptr) {
+					if (width != nullptr || scale_width != nullptr || pending_height) {
+						region.x = parent_region.x + parent_region.w - region.w - parent_region.w * (*scale_right);
+					}
+					else {
+						region.w = parent_region.x + parent_region.w - region.x - parent_region.w * (*scale_right);
+					}
+				}
+			}
+
 
 		if (height != nullptr)region.h = *height;
 		else if (scale_height != nullptr)region.h = parent_region.h * (*scale_height);
-		if (pending_height) region.h = measureChildHeight();
+		else if (pending_height) region.h = measureChildHeight();
+		
+		
+			//上下都没设置，只设置了高，那就垂直居中
+			if (pending_top == nullptr && pending_bottom == nullptr
+				&& top == nullptr && scale_top == nullptr && bottom == nullptr && scale_bottom == nullptr 
+				&& (height!=nullptr||scale_height!=nullptr||pending_height)) {
+				region.y = parent_region.y + (parent_region.h - region.h) / 2;
+			}
 
-		//左右都没设置，只设置了宽，那就水平居中
-		if (pending_left == nullptr && pending_right == nullptr 
-			&& left == nullptr && scale_left == nullptr && right == nullptr && scale_right == nullptr 
-			&& (width!=nullptr||scale_width!=nullptr)) {
-			region.x = parent_region.x + (parent_region.w - region.w) / 2;
-		}
-		//上下都没设置，只设置了高，那就垂直居中
-		if (pending_top == nullptr && pending_bottom == nullptr
-			&& top == nullptr && scale_top == nullptr && bottom == nullptr && scale_bottom == nullptr 
-			&& (height!=nullptr||scale_height!=nullptr)) {
-			region.y = parent_region.y + (parent_region.h - region.h) / 2;
-		}
+			//设置了top、scale_top或pending_top时，计算y
+			if (parent != nullptr && parent->pending_height && pending_top == nullptr && pending_bottom == nullptr) {
+				region.y=parent_region.y;
+			}
+			else if (pending_top != nullptr) {
+				region.y = pending_top->region.y + pending_top->region.h;
+			}
+			if (top != nullptr) {
+				region.y = parent_region.y + *top;
+			}
+			else if (scale_top != nullptr) {
+				region.y = parent_region.y + parent_region.h * (*scale_top);
+			}
 
-		//设置了left、scale_left或pending_left时，计算x
-		if (pending_left != nullptr) {
-			region.x = pending_left->region.x + pending_left->region.w;
-		}
-		else if (left != nullptr) {
-			region.x = parent_region.x + *left;
-		}
-		else if (scale_left != nullptr) {
-			region.x = parent_region.x + parent_region.w * (*scale_left);
-		}
-
-		//设置了top、scale_top或pending_top时，计算y
-		if (pending_top != nullptr) {
-			region.y = pending_top->region.y + pending_top->region.h;
-		}
-		if (top != nullptr) {
-			region.y = parent_region.y + *top;
-		}
-		else if (scale_top != nullptr) {
-			region.y = parent_region.y + parent_region.h * (*scale_top);
-		}
-
-		//设置了right、scale_right时，如果同时设置了width或scale_width（此时left无效），计算x；否则结合left计算w
-		//计算pending_right pending_bottom需要region.h region.w,故放在后面计算
-		if (pending_right == nullptr) {
-			if (right != nullptr) {
-				if (width!=nullptr||scale_width!=nullptr) {
-					region.x = parent_region.x + parent_region.w-region.w-*right;
+			//设置了bottom、scale_bottom时，如果同时设置了height或scale_height（此时top无效），计算x；否则结合top计算h
+			if (pending_bottom == nullptr && pending_top == nullptr) {
+				if (bottom != nullptr) {
+					if (height != nullptr || scale_height != nullptr || pending_height) {
+						region.y = parent_region.y + parent_region.h - region.h - *bottom;
+					}
+					else {
+						region.h = parent_region.y + parent_region.h - region.y - *bottom;
+					}
 				}
-				else {
-					region.w = parent_region.x + parent_region.w - region.x - *right;
+				else if (scale_bottom != nullptr) {
+					if (height != nullptr || scale_height != nullptr || pending_height) {
+						region.y = parent_region.y + parent_region.h - region.h - parent_region.h * (*scale_bottom);
+					}
+					else {
+						region.h = parent_region.y + parent_region.h - region.y - parent_region.h * (*scale_bottom);
+					}
 				}
 			}
-			else if (scale_right != nullptr) {
-				if (width != nullptr||scale_width!=nullptr) {
-					region.x = parent_region.x + parent_region.w - region.w - parent_region.w * (*scale_right);
-				}
-				else {
-					region.w = parent_region.x + parent_region.w - region.x - parent_region.w * (*scale_right);
-				}
-			}
-		}
-		//设置了bottom、scale_bottom时，如果同时设置了height或scale_height（此时top无效），计算x；否则结合top计算h
-		if (pending_bottom == nullptr) {
-			if (bottom != nullptr) {
-				if (height != nullptr || scale_height != nullptr) {
-					region.y = parent_region.y + parent_region.h - region.h - *bottom;
-				}
-				else {
-					region.h = parent_region.y + parent_region.h - region.y - *bottom;
-				}
-			}
-			else if (scale_bottom != nullptr) {
-				if (height != nullptr || scale_height != nullptr) {
-					region.y = parent_region.y + parent_region.h - region.h - parent_region.h * (*scale_bottom);
-				}
-				else {
-					region.h = parent_region.y + parent_region.h - region.y - parent_region.h * (*scale_bottom);
-				}
-			}
-		}
+
 
 		//限制尺寸在min和max之间，没有设置min max则不限制
 		if (max_width != nullptr) {
@@ -162,10 +217,10 @@ public:
 		}
 
 		//调整right、bottom待定的layout 因为计算需要得知w h所以放在尺寸限制计算之后
-		if (pending_right != nullptr) {
+		if (!pending_width && pending_right != nullptr) {
 			region.x = pending_right->region.x - region.w;
 		}
-		if (pending_bottom != nullptr) {
+		if (!pending_height && pending_bottom != nullptr) {
 			region.y = pending_bottom->region.y - region.h;
 		}
 
@@ -200,9 +255,9 @@ public:
 		//通知刷新
 	}
 	void setChild(Layout* layout) {
-		if(child!=nullptr)delete child;
+		//if(child!=nullptr)delete child;
 		this->child=layout;
-		child->parent=this;
+		layout->parent=this;
 		display=child;
 		//添加region到脏矩形
 		//resetRegion
@@ -241,21 +296,25 @@ public:
 			if(pending_left!=nullptr)delete pending_left;
 			pending_left=layout;
 			layout->neighbor_right=this;
+			parent= layout->parent;
 			break;
 		case Edge::top:
 			if(pending_top!=nullptr)delete pending_top;
 			pending_top=layout;
 			layout->neighbor_bottom=this;
+			parent = layout->parent;
 			break;
 		case Edge::right:
 			if(pending_right!=nullptr)delete pending_right;
 			pending_right=layout;
 			layout->neighbor_left=this;
+			parent = layout->parent;
 			break;
 		case Edge::bottom:
 			if(pending_bottom!=nullptr)delete pending_bottom;
 			pending_bottom=layout;
 			layout->neighbor_top=this;
+			parent = layout->parent;
 			break;
 		}
 		//添加region到脏矩形
