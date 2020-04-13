@@ -1,0 +1,3 @@
+C:/Users/Yorkin/prj/cpp/KatLayout/cmake-build-debug/CMakeFiles/LayoutTest.dir
+C:/Users/Yorkin/prj/cpp/KatLayout/cmake-build-debug/CMakeFiles/edit_cache.dir
+C:/Users/Yorkin/prj/cpp/KatLayout/cmake-build-debug/CMakeFiles/rebuild_cache.dir

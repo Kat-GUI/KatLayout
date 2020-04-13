@@ -1,150 +1,83 @@
 #ifndef KAT_LAYOUT
 #define KAT_LAYOUT
-#include<functional>
-#include<list>
-#include<typeindex>
-#include<memory>
-#include<string>
-
-class Widget{
+#include <functional>
+#include <list>
+#include <typeindex>
+#include <memory>
+#include <string>
+#include "../cpp_DOM/src/DOM.h"
+class Widget
+{
 public:
 };
 
-struct absRegion {
-	float x=0,y=0,w=0,h=0;
+struct absRegion
+{
+	float x = 0, y = 0, w = 0, h = 0;
 };
 
-struct Size {
-	int height,width;
-	float scale_height,scale_width;
+struct Size
+{
+	int height, width;
+	float scale_height, scale_width;
 };
 
 class Layout;
-class layoutProperties {
+class layoutProperties
+{
 public:
 	friend Layout;
-	//±íÊ¾ÉÏÏÂ×óÓÒ½ôÌùµÄ¶ÔÏó nullptrÊ±ÏàÓ¦¾àÀë±äÁ¿ÎŞĞ§
-	int* left = nullptr, * top = nullptr, * right = nullptr, * bottom = nullptr;
-	//ÕâËÄ¸ö±äÁ¿¹©¼ÆËãÊ¹ÓÃ
-	Layout* pending_top = nullptr, * pending_left = nullptr, * pending_right = nullptr, * pending_bottom = nullptr;
-	//ÕâËÄ¸ö±äÁ¿¹©»æÍ¼Ê±Ê¹ÓÃ£¬ÓÃÀ´ÕÒµ½ËÄ¸ö·½Ïò½ôÌù×Ô¼ºµÄÁÚ¾Ó¡£neighbor_xxxÓëpending_xxxĞÎ³ÉË«ÏòÁ´±í
-	//Í¬Ê±Ò²±ÜÃâ¼ÆËãÊ±Á½¸ö½ôÌùµÄlayoutĞÎ³É¡°¿Õµº¡±£¨A¸æÖªÔÚBÓÒ±ß¡¢B¸æÖªÔÚA×ó±ß£©Ôì³ÉÎŞ·¨¼ÆËã×ø±êµÄÏÖÏó
-	Layout* neighbor_top = nullptr, * neighbor_left = nullptr, * neighbor_right = nullptr, * neighbor_bottom = nullptr;
-	//±íÊ¾´óĞ¡ÓÉ×Ó¶ÔÏó¾ö¶¨£¬pendingÎªtrueÊ±ÏŞÖÆĞĞÎª£¨max¡¢min£©ÒÀÈ»ÓĞĞ§
+	//è¡¨ç¤ºä¸Šä¸‹å·¦å³ç´§è´´çš„å¯¹è±¡ nullptræ—¶ç›¸åº”è·ç¦»å˜é‡æ— æ•ˆ
+	int *left = nullptr, *top = nullptr, *right = nullptr, *bottom = nullptr;
+	//è¿™å››ä¸ªå˜é‡ä¾›è®¡ç®—ä½¿ç”¨
+	Layout *pending_top = nullptr, *pending_left = nullptr, *pending_right = nullptr, *pending_bottom = nullptr;
+	//è¿™å››ä¸ªå˜é‡ä¾›ç»˜å›¾æ—¶ä½¿ç”¨ï¼Œç”¨æ¥æ‰¾åˆ°å››ä¸ªæ–¹å‘ç´§è´´è‡ªå·±çš„é‚»å±…ã€‚neighbor_xxxä¸pending_xxxå½¢æˆåŒå‘é“¾è¡¨
+	//åŒæ—¶ä¹Ÿé¿å…è®¡ç®—æ—¶ä¸¤ä¸ªç´§è´´çš„layoutå½¢æˆâ€œç©ºå²›â€ï¼ˆAå‘ŠçŸ¥åœ¨Bå³è¾¹ã€Bå‘ŠçŸ¥åœ¨Aå·¦è¾¹ï¼‰é€ æˆæ— æ³•è®¡ç®—åæ ‡çš„ç°è±¡
+	Layout *neighbor_top = nullptr, *neighbor_left = nullptr, *neighbor_right = nullptr, *neighbor_bottom = nullptr;
+	//è¡¨ç¤ºå¤§å°ç”±å­å¯¹è±¡å†³å®šï¼Œpendingä¸ºtrueæ—¶é™åˆ¶è¡Œä¸ºï¼ˆmaxã€minï¼‰ä¾ç„¶æœ‰æ•ˆ
 	bool pending_width = false, pending_height = false;
-	int* width = nullptr, * max_width = nullptr, * min_width = nullptr;
-	int* height = nullptr, * max_height = nullptr, * min_height = nullptr;
+	int *width = nullptr, *max_width = nullptr, *min_width = nullptr;
+	int *height = nullptr, *max_height = nullptr, *min_height = nullptr;
 
-	float* scale_left = nullptr, * scale_top = nullptr, * scale_right = nullptr, * scale_bottom = nullptr;
-	float* scale_width = nullptr, * scale_max_width = nullptr, * scale_min_width = nullptr;
-	float* scale_height = nullptr, * scale_max_height = nullptr, * scale_min_height = nullptr;
-	//Layout* display = nullptr;/*,*parent=nullptr;*/ //¿¼ÂÇµ½¶à²¼¾ÖÊ±Ò»¸ö²¼¾Ö¿ÉÄÜÍ¬Ê±ÊÇ¼¸¸ö²¼¾ÖµÄ×Ó¶ÔÏó£¨Õâ¼¸¸ö²¼¾Ö²»»áÍ¬Ê±³öÏÖ£©¹ÊÒÆ³ı´Ë±äÁ¿
-	Layout* child = nullptr;
-	layoutProperties operator+(const layoutProperties obj) {
-#define FILL(ptr) if(ptr==nullptr)ptr=obj.ptr
-		FILL(left);			FILL(top);				FILL(right);			FILL(bottom); 
-		FILL(pending_top);	FILL(pending_left);		FILL(pending_right);	FILL(pending_bottom); 
-		FILL(neighbor_top); FILL(neighbor_left);	FILL(neighbor_right);	FILL(neighbor_bottom); 
-		FILL(scale_left);	FILL(scale_top);		FILL(scale_right);		FILL(scale_bottom);
-		FILL(width);		FILL(max_width);		FILL(min_width);		
-		FILL(height);		FILL(min_height);		FILL(max_height);
-		FILL(scale_width);	FILL(scale_max_width);	FILL(scale_min_width);
-		FILL(scale_height);	FILL(scale_max_height); FILL(scale_min_height); 
-		FILL(child);
-#undef FILL(ptr)
-		if(obj.pending_width)pending_width=true;
-		if(obj.pending_height)pending_height=true;
-		return *this;
-	}
+	float *scale_left = nullptr, *scale_top = nullptr, *scale_right = nullptr, *scale_bottom = nullptr;
+	float *scale_width = nullptr, *scale_max_width = nullptr, *scale_min_width = nullptr;
+	float *scale_height = nullptr, *scale_max_height = nullptr, *scale_min_height = nullptr;
+	//Layout* display = nullptr;/*,*parent=nullptr;*/ //è€ƒè™‘åˆ°å¤šå¸ƒå±€æ—¶ä¸€ä¸ªå¸ƒå±€å¯èƒ½åŒæ—¶æ˜¯å‡ ä¸ªå¸ƒå±€çš„å­å¯¹è±¡ï¼ˆè¿™å‡ ä¸ªå¸ƒå±€ä¸ä¼šåŒæ—¶å‡ºç°ï¼‰æ•…ç§»é™¤æ­¤å˜é‡
+	Layout *child = nullptr;
 };
 
-//layoutProperties left(int px) {
-//	layoutProperties tmp;
-//	tmp.left=new int(px);
-//	return tmp;
-//}
-//layoutProperties top(int px) {
-//	layoutProperties tmp;
-//	tmp.top=new int(px);
-//	return tmp;
-//}
-//layoutProperties right(int px) {
-//	layoutProperties tmp;
-//	tmp.right=new int(px);
-//	return tmp;
-//}
-//layoutProperties bottom(int px) {
-//	layoutProperties tmp;
-//	tmp.bottom=new int(px);
-//	return tmp;
-//}
-//layoutProperties limitMinWidth(int px) {
-//	layoutProperties tmp;
-//	tmp.min_width=new int(px);
-//	return tmp;
-//}
-//layoutProperties limitMinWidth(float scale) {
-//	layoutProperties tmp;
-//	tmp.scale_min_width=new float(scale);
-//	return tmp;
-//}
-//layoutProperties limitMaxWidth(int px) {
-//	layoutProperties tmp;
-//	tmp.max_width=new int(px);
-//	return tmp;
-//}
-//layoutProperties limitMaxWidth(float scale) {
-//	layoutProperties tmp;
-//	tmp.scale_max_width = new float(scale);
-//	return tmp;
-//}
-//
-//layoutProperties limitMinHeight(int px) {
-//	layoutProperties tmp;
-//	tmp.min_height = new int(px);
-//	return tmp;
-//}
-//layoutProperties limitMinHeight(float scale) {
-//	layoutProperties tmp;
-//	tmp.scale_min_height = new float(scale);
-//	return tmp;
-//}
-//layoutProperties limitMaxHeight(int px) {
-//	layoutProperties tmp;
-//	tmp.max_height = new int(px);
-//	return tmp;
-//}
-//layoutProperties limitMaxHeight(float scale) {
-//	layoutProperties tmp;
-//	tmp.scale_max_height = new float(scale);
-//	return tmp;
-//}
+class MutiLayout;
+class Layout
+{
+	friend MutiLayout;
 
-class Layout{
-public:
-	static Layout* Zero;
-public:
-	layoutProperties* display=nullptr;
-	layoutProperties data;
+protected:
+	layoutProperties *display = nullptr;
 	absRegion region;
-	Layout():Layout()
-	Layout(layoutProperties properties) {
-		data=properties;
-		display=&data;
+	layoutProperties data;
+
+public:
+	static Layout *Zero;
+	Layout() : display(&data){};
+	Layout(DOM::initializer property)
+	{
+		DOM::moveProperty(property, &data);
+		display = &data;
 	}
-	//Áô¸øÅÉÉúÀàÖØĞ´
-	virtual float measureChildWidth(){
-		int val=0;
-		Layout *iter=this;
+	//ç•™ç»™æ´¾ç”Ÿç±»é‡å†™
+	virtual float measureChildWidth()
+	{
+		int val = 0;
+		Layout *iter = this;
 		if (iter != nullptr)
 		{
-			while (iter->display->neighbor_left != nullptr) 
-				iter=iter->display->neighbor_left;
+			while (iter->display->neighbor_left != nullptr)
+				iter = iter->display->neighbor_left;
 			while (iter != nullptr)
 			{
 				iter->resetRegion(Zero);
-				val+=iter->region.w;
-				iter=iter->display->neighbor_right;
+				val += iter->region.w;
+				iter = iter->display->neighbor_right;
 			}
 			iter = this;
 			while (iter->display->neighbor_top != nullptr)
@@ -152,15 +85,17 @@ public:
 			while (iter != nullptr)
 			{
 				iter->resetRegion(Zero);
-				if(iter->region.w>val)val=iter->region.w;
+				if (iter->region.w > val)
+					val = iter->region.w;
 				iter = iter->display->neighbor_bottom;
 			}
 		}
 		return val;
 	}
-	virtual float measureChildHeight(){
+	virtual float measureChildHeight()
+	{
 		int val = 0;
-		Layout* iter = this;
+		Layout *iter = this;
 		if (iter != nullptr)
 		{
 			while (iter->display->neighbor_top != nullptr)
@@ -177,176 +112,224 @@ public:
 			while (iter != nullptr)
 			{
 				iter->resetRegion(Zero);
-				if(iter->region.h>val)val=iter->region.h;
+				if (iter->region.h > val)
+					val = iter->region.h;
 				iter = iter->display->neighbor_right;
 			}
 		}
 		return val;
 	}
-	virtual void resetRegion(Layout* parent) {
-		//±¾²¼¾ÖÒş²ØÊ±²»¼ÆËã
-		if(display==nullptr)return;
+	virtual void resetRegion(Layout *parent)
+	{
+		//æœ¬å¸ƒå±€éšè—æ—¶ä¸è®¡ç®—
+		if (display == nullptr)
+			return;
 
-		//ÉèÖÃÁË¿í¶È¡¢¸ß¶ÈÊ±£¬Ö±½Ó¼ÆËãw h
-		if (display->width != nullptr)region.w = *display->width;
-		else if (display->scale_width != nullptr)region.w = parent->region.w * (*display->scale_width);
-		else if (display->pending_width) region.w = measureChildWidth();
-		 
+		//è®¾ç½®äº†å®½åº¦ã€é«˜åº¦æ—¶ï¼Œç›´æ¥è®¡ç®—w h
+		if (display->width != nullptr)
+			region.w = *display->width;
+		else if (display->scale_width != nullptr)
+			region.w = parent->region.w * (*display->scale_width);
+		else if (display->pending_width)
+			region.w = measureChildWidth();
 
-		//×óÓÒ¶¼Ã»ÉèÖÃ£¬Ö»ÉèÖÃÁË¿í£¬ÄÇ¾ÍË®Æ½¾ÓÖĞ
-		if (display->pending_left == nullptr && display->pending_right == nullptr
-			&& display->left == nullptr && display->scale_left == nullptr && display->right == nullptr && display->scale_right == nullptr
-			&& (display->width != nullptr || display->scale_width != nullptr || display->pending_width)) {
+		//å·¦å³éƒ½æ²¡è®¾ç½®ï¼Œåªè®¾ç½®äº†å®½ï¼Œé‚£å°±æ°´å¹³å±…ä¸­
+		if (display->pending_left == nullptr && display->pending_right == nullptr && display->left == nullptr && display->scale_left == nullptr && display->right == nullptr && display->scale_right == nullptr && (display->width != nullptr || display->scale_width != nullptr || display->pending_width))
+		{
 			region.x = parent->region.x + (parent->region.w - region.w) / 2;
 		}
 
-		//ÉèÖÃÁËleft¡¢scale_left»òpending_leftÊ±£¬¼ÆËãx
-		if (parent->display->pending_width && display->pending_left == nullptr && display->pending_right == nullptr) {
+		//è®¾ç½®äº†leftã€scale_leftæˆ–pending_leftæ—¶ï¼Œè®¡ç®—x
+		if (parent->display->pending_width && display->pending_left == nullptr && display->pending_right == nullptr)
+		{
 			region.x = parent->region.x;
 		}
-		else if (display->pending_left != nullptr) {
+		else if (display->pending_left != nullptr)
+		{
 			region.x = display->pending_left->region.x + display->pending_left->region.w;
 		}
-		else if (display->left != nullptr) {
+		else if (display->left != nullptr)
+		{
 			region.x = parent->region.x + *display->left;
 		}
-		else if (display->scale_left != nullptr) {
+		else if (display->scale_left != nullptr)
+		{
 			region.x = parent->region.x + parent->region.w * (*display->scale_left);
 		}
 
-		//ÉèÖÃÁËright¡¢scale_rightÊ±£¬Èç¹ûÍ¬Ê±ÉèÖÃÁËwidth»òscale_width£¨´ËÊ±leftÎŞĞ§£©£¬¼ÆËãx£»·ñÔò½áºÏleft¼ÆËãw
-		//¼ÆËãpending_right pending_bottomĞèÒªregion.h region.w,¹Ê·ÅÔÚºóÃæ¼ÆËã
-		if (display->pending_right == nullptr && display->pending_left == nullptr) {
-			if (display->right != nullptr) {
-				if (display->width != nullptr || display->scale_width != nullptr || display->pending_width) {
+		//è®¾ç½®äº†rightã€scale_rightæ—¶ï¼Œå¦‚æœåŒæ—¶è®¾ç½®äº†widthæˆ–scale_widthï¼ˆæ­¤æ—¶leftæ— æ•ˆï¼‰ï¼Œè®¡ç®—xï¼›å¦åˆ™ç»“åˆleftè®¡ç®—w
+		//è®¡ç®—pending_right pending_bottoméœ€è¦region.h region.w,æ•…æ”¾åœ¨åé¢è®¡ç®—
+		if (display->pending_right == nullptr && display->pending_left == nullptr)
+		{
+			if (display->right != nullptr)
+			{
+				if (display->width != nullptr || display->scale_width != nullptr || display->pending_width)
+				{
 					region.x = parent->region.x + parent->region.w - region.w - *display->right;
 				}
-				else {
+				else
+				{
 					region.w = parent->region.x + parent->region.w - region.x - *display->right;
 				}
 			}
-			else if (display->scale_right != nullptr) {
-				if (display->width != nullptr || display->scale_width != nullptr || display->pending_height) {
+			else if (display->scale_right != nullptr)
+			{
+				if (display->width != nullptr || display->scale_width != nullptr || display->pending_height)
+				{
 					region.x = parent->region.x + parent->region.w - region.w - parent->region.w * (*display->scale_right);
 				}
-				else {
+				else
+				{
 					region.w = parent->region.x + parent->region.w - region.x - parent->region.w * (*display->scale_right);
 				}
 			}
 		}
 
+		if (display->height != nullptr)
+			region.h = *display->height;
+		else if (display->scale_height != nullptr)
+			region.h = parent->region.h * (*display->scale_height);
+		else if (display->pending_height)
+			region.h = measureChildHeight();
 
-		if (display->height != nullptr)region.h = *display->height;
-		else if (display->scale_height != nullptr)region.h = parent->region.h * (*display->scale_height);
-		else if (display->pending_height) region.h = measureChildHeight();
-
-
-		//ÉÏÏÂ¶¼Ã»ÉèÖÃ£¬Ö»ÉèÖÃÁË¸ß£¬ÄÇ¾Í´¹Ö±¾ÓÖĞ
-		if (display->pending_top == nullptr && display->pending_bottom == nullptr
-			&& display->top == nullptr && display->scale_top == nullptr && display->bottom == nullptr && display->scale_bottom == nullptr
-			&& (display->height != nullptr || display->scale_height != nullptr || display->pending_height)) {
+		//ä¸Šä¸‹éƒ½æ²¡è®¾ç½®ï¼Œåªè®¾ç½®äº†é«˜ï¼Œé‚£å°±å‚ç›´å±…ä¸­
+		if (display->pending_top == nullptr && display->pending_bottom == nullptr && display->top == nullptr && display->scale_top == nullptr && display->bottom == nullptr && display->scale_bottom == nullptr && (display->height != nullptr || display->scale_height != nullptr || display->pending_height))
+		{
 			region.y = parent->region.y + (parent->region.h - region.h) / 2;
 		}
 
-		//ÉèÖÃÁËtop¡¢scale_top»òpending_topÊ±£¬¼ÆËãy
-		if (parent->display->pending_height && display->pending_top == nullptr && display->pending_bottom == nullptr) {
+		//è®¾ç½®äº†topã€scale_topæˆ–pending_topæ—¶ï¼Œè®¡ç®—y
+		if (parent->display->pending_height && display->pending_top == nullptr && display->pending_bottom == nullptr)
+		{
 			region.y = parent->region.y;
 		}
-		else if (display->pending_top != nullptr) {
+		else if (display->pending_top != nullptr)
+		{
 			region.y = display->pending_top->region.y + display->pending_top->region.h;
 		}
-		if (display->top != nullptr) {
+		if (display->top != nullptr)
+		{
 			region.y = parent->region.y + *display->top;
 		}
-		else if (display->scale_top != nullptr) {
+		else if (display->scale_top != nullptr)
+		{
 			region.y = parent->region.y + parent->region.h * (*display->scale_top);
 		}
 
-		//ÉèÖÃÁËbottom¡¢scale_bottomÊ±£¬Èç¹ûÍ¬Ê±ÉèÖÃÁËheight»òscale_height£¨´ËÊ±topÎŞĞ§£©£¬¼ÆËãx£»·ñÔò½áºÏtop¼ÆËãh
-		if (display->pending_bottom == nullptr && display->pending_top == nullptr) {
-			if (display->bottom != nullptr) {
-				if (display->height != nullptr || display->scale_height != nullptr || display->pending_height) {
+		//è®¾ç½®äº†bottomã€scale_bottomæ—¶ï¼Œå¦‚æœåŒæ—¶è®¾ç½®äº†heightæˆ–scale_heightï¼ˆæ­¤æ—¶topæ— æ•ˆï¼‰ï¼Œè®¡ç®—xï¼›å¦åˆ™ç»“åˆtopè®¡ç®—h
+		if (display->pending_bottom == nullptr && display->pending_top == nullptr)
+		{
+			if (display->bottom != nullptr)
+			{
+				if (display->height != nullptr || display->scale_height != nullptr || display->pending_height)
+				{
 					region.y = parent->region.y + parent->region.h - region.h - *display->bottom;
 				}
-				else {
+				else
+				{
 					region.h = parent->region.y + parent->region.h - region.y - *display->bottom;
 				}
 			}
-			else if (display->scale_bottom != nullptr) {
-				if (display->height != nullptr || display->scale_height != nullptr || display->pending_height) {
+			else if (display->scale_bottom != nullptr)
+			{
+				if (display->height != nullptr || display->scale_height != nullptr || display->pending_height)
+				{
 					region.y = parent->region.y + parent->region.h - region.h - parent->region.h * (*display->scale_bottom);
 				}
-				else {
+				else
+				{
 					region.h = parent->region.y + parent->region.h - region.y - parent->region.h * (*display->scale_bottom);
 				}
 			}
 		}
 
-
-		//ÏŞÖÆ³ß´çÔÚminºÍmaxÖ®¼ä£¬Ã»ÓĞÉèÖÃmin maxÔò²»ÏŞÖÆ
-		if (display->max_width != nullptr) {
-			if (region.w > * display->max_width) region.w = *display->max_width;
+		//é™åˆ¶å°ºå¯¸åœ¨minå’Œmaxä¹‹é—´ï¼Œæ²¡æœ‰è®¾ç½®min maxåˆ™ä¸é™åˆ¶
+		if (display->max_width != nullptr)
+		{
+			if (region.w > *display->max_width)
+				region.w = *display->max_width;
 		}
-		else if (display->scale_max_width != nullptr) {
-			if (region.w / parent->region.w > * display->scale_max_width)region.w = parent->region.w * (*display->scale_max_width);
-		}
-
-		if (display->min_width != nullptr) {
-			if (region.w < *display->min_width) region.w = *display->min_width;
-		}
-		else if (display->scale_min_width != nullptr) {
-			if (region.w / parent->region.w < *display->scale_min_width)region.w = parent->region.w * (*display->scale_min_width);
+		else if (display->scale_max_width != nullptr)
+		{
+			if (region.w / parent->region.w > *display->scale_max_width)
+				region.w = parent->region.w * (*display->scale_max_width);
 		}
 
-		if (display->max_height != nullptr) {
-			if (region.h > * display->max_height) region.h = *display->max_height;
+		if (display->min_width != nullptr)
+		{
+			if (region.w < *display->min_width)
+				region.w = *display->min_width;
 		}
-		else if (display->scale_max_height != nullptr) {
-			if (region.h / parent->region.h > * display->scale_max_height)region.h = parent->region.h * (*display->scale_max_height);
-		}
-
-		if (display->min_height != nullptr) {
-			if (region.h < *display->min_height) region.h = *display->min_height;
-		}
-		else if (display->scale_min_height != nullptr) {
-			if (region.h / parent->region.h < *display->scale_min_height)region.h = parent->region.h * (*display->scale_min_height);
+		else if (display->scale_min_width != nullptr)
+		{
+			if (region.w / parent->region.w < *display->scale_min_width)
+				region.w = parent->region.w * (*display->scale_min_width);
 		}
 
-		//µ÷Õûright¡¢bottom´ı¶¨µÄlayout ÒòÎª¼ÆËãĞèÒªµÃÖªw hËùÒÔ·ÅÔÚ³ß´çÏŞÖÆ¼ÆËãÖ®ºó
-		if (!display->pending_width && display->pending_right != nullptr) {
+		if (display->max_height != nullptr)
+		{
+			if (region.h > *display->max_height)
+				region.h = *display->max_height;
+		}
+		else if (display->scale_max_height != nullptr)
+		{
+			if (region.h / parent->region.h > *display->scale_max_height)
+				region.h = parent->region.h * (*display->scale_max_height);
+		}
+
+		if (display->min_height != nullptr)
+		{
+			if (region.h < *display->min_height)
+				region.h = *display->min_height;
+		}
+		else if (display->scale_min_height != nullptr)
+		{
+			if (region.h / parent->region.h < *display->scale_min_height)
+				region.h = parent->region.h * (*display->scale_min_height);
+		}
+
+		//è°ƒæ•´rightã€bottomå¾…å®šçš„layout å› ä¸ºè®¡ç®—éœ€è¦å¾—çŸ¥w hæ‰€ä»¥æ”¾åœ¨å°ºå¯¸é™åˆ¶è®¡ç®—ä¹‹å
+		if (!display->pending_width && display->pending_right != nullptr)
+		{
 			region.x = display->pending_right->region.x - region.w;
 		}
-		if (!display->pending_height && display->pending_bottom != nullptr) {
+		if (!display->pending_height && display->pending_bottom != nullptr)
+		{
 			region.y = display->pending_bottom->region.y - region.h;
 		}
 	}
-public:
-	enum class Edge{left,top,right,bottom};
+	enum class Edge
+	{
+		left,
+		top,
+		right,
+		bottom
+	};
 	//void setContent(Widget* content) {
 	//	if(content!=nullptr)delete content;
 	//	this->display->content=content;
-	//	//Ìí¼Óregionµ½Ôà¾ØĞÎ
+	//	//æ·»åŠ regionåˆ°è„çŸ©å½¢
 	//	//....
-	//	//Í¨ÖªË¢ĞÂ
+	//	//é€šçŸ¥åˆ·æ–°
 	//}
-	std::list<Widget*> content;
+	std::list<Widget *> content;
 
-	//ºÃÏñ¹¹Ôìº¯ÊıÀïÉèÖÃchildºÍneighbor²»ÊÇºÜÊæ·ş...ÒÔºó¿´¿´ÔõÃ´¸ÄºÃÁË
+	//å¥½åƒæ„é€ å‡½æ•°é‡Œè®¾ç½®childå’Œneighborä¸æ˜¯å¾ˆèˆ’æœ...ä»¥åçœ‹çœ‹æ€ä¹ˆæ”¹å¥½äº†
 	//
 	//void setChild(Layout* layout) {
 	//	//if(child!=nullptr)delete child;
 	//	this->child=layout;
 	//	//layout->parent=this;
 	//	display=child;
-	//	//Ìí¼Óregionµ½Ôà¾ØĞÎ
+	//	//æ·»åŠ regionåˆ°è„çŸ©å½¢
 	//	//resetRegion
-	//	//Ìí¼Óregionµ½Ôà¾ØĞÎ
+	//	//æ·»åŠ regionåˆ°è„çŸ©å½¢
 	//	//....
-	//	//Í¨ÖªË¢ĞÂ
+	//	//é€šçŸ¥åˆ·æ–°
 	//}
-	//ÉèÖÃºÍÄ¿±êlayout½ô°¤¡£ÀıÈçEdge::leftÊÇ½«±¾ÊµÀıµÄ×ó±ßºÍÄ¿±êlayoutµÄÓÒ±ß¶ÔÆë
-	//Í¬Ê±Ä¿±êlayout³ÉÎª±¾ÊµÀıµÄpending_left
-	//±¾ÊµÀı³ÉÎªÄ¿±êlayoutµÄneighbor_right
+	//è®¾ç½®å’Œç›®æ ‡layoutç´§æŒ¨ã€‚ä¾‹å¦‚Edge::leftæ˜¯å°†æœ¬å®ä¾‹çš„å·¦è¾¹å’Œç›®æ ‡layoutçš„å³è¾¹å¯¹é½
+	//åŒæ—¶ç›®æ ‡layoutæˆä¸ºæœ¬å®ä¾‹çš„pending_left
+	//æœ¬å®ä¾‹æˆä¸ºç›®æ ‡layoutçš„neighbor_right
 	//void setNeighbor(Layout* layout, Edge edge) {
 	//	switch (edge) {
 	//	case Edge::left:
@@ -374,60 +357,70 @@ public:
 	//		//parent = layout->parent;
 	//		break;
 	//	}
-	//	//Ìí¼Óregionµ½Ôà¾ØĞÎ
+	//	//æ·»åŠ regionåˆ°è„çŸ©å½¢
 	//	//resetRegion
-	//	//Ìí¼Óregionµ½Ôà¾ØĞÎ
+	//	//æ·»åŠ regionåˆ°è„çŸ©å½¢
 	//	//....
-	//	//Í¨ÖªË¢ĞÂ
+	//	//é€šçŸ¥åˆ·æ–°
 	//}
-	
 };
-Layout* Layout::Zero = new Layout(layoutProperties());
+Layout *Layout::Zero = new Layout();
 
-using displayCondition=std::function<bool(Size)>;
+using displayCondition = std::function<bool(Size)>;
 
-class MutiLayout:public Layout {
-	displayCondition smaller_condition,larger_condition;
-	layoutProperties smaller_layout,larger_layout;
-	virtual void resetRegion(Layout* parent)override {
-		//Ñ¡ÔñºÏÊÊµÄlayout
+class MutiLayout : public Layout
+{
+	displayCondition smaller_condition, larger_condition;
+	layoutProperties smaller_layout, larger_layout;
+	virtual void resetRegion(Layout *parent) override
+	{
+		//é€‰æ‹©åˆé€‚çš„layout
 		Size size;
 		bool flag = false;
 		size.height = region.h;
 		size.width = region.w;
 		size.scale_height = region.h / parent->region.h;
 		size.scale_width = region.w / parent->region.w;
-		if (larger_condition) {
-			if (larger_condition(size)) {
+		if (larger_condition)
+		{
+			if (larger_condition(size))
+			{
 				display = &larger_layout;
 				flag = true;
 			}
 		}
-		if (smaller_condition) {
-			if (smaller_condition(size)) {
+		if (smaller_condition)
+		{
+			if (smaller_condition(size))
+			{
 				display = &smaller_layout;
 				flag = true;
 			}
 		}
-		if (!flag)display = &data;
+		if (!flag)
+			display = &data;
 
 		Layout::resetRegion(parent);
 	}
+
 public:
-	MutiLayout(layoutProperties smaller, displayCondition smaller_condition,layoutProperties normal,
-									   layoutProperties larger, displayCondition larger_condition):Layout(normal){
-		this->data=normal;
-		this->smaller_layout=smaller;
-		this->larger_layout=larger;
-		this->larger_condition=larger_condition;
-		this->smaller_condition=smaller_condition;
+	MutiLayout(layoutProperties smaller, displayCondition smaller_condition, layoutProperties normal,
+			   layoutProperties larger, displayCondition larger_condition)
+	{
+		this->data = normal;
+		this->smaller_layout = smaller;
+		this->larger_layout = larger;
+		this->larger_condition = larger_condition;
+		this->smaller_condition = smaller_condition;
 	}
-	MutiLayout(layoutProperties smaller, displayCondition smaller_condition,layoutProperties normal) :Layout(normal) {
+	MutiLayout(layoutProperties smaller, displayCondition smaller_condition, layoutProperties normal)
+	{
 		this->data = normal;
 		this->smaller_layout = smaller;
 		this->smaller_condition = smaller_condition;
 	}
-	MutiLayout(layoutProperties normal,layoutProperties larger, displayCondition larger_condition) :Layout(normal) {
+	MutiLayout(layoutProperties normal, layoutProperties larger, displayCondition larger_condition)
+	{
 		this->data = normal;
 		this->larger_layout = larger;
 		this->larger_condition = larger_condition;
@@ -438,11 +431,11 @@ public:
 	//	this->smaller_layout = layout;
 	//	//if(layout!=nullptr)layout->parent=this;
 	//	this->smaller_condition = condition;
-	//	//Ìí¼Óregionµ½Ôà¾ØĞÎ
+	//	//æ·»åŠ regionåˆ°è„çŸ©å½¢
 	//	//resetRegion
-	//	//Ìí¼Óregionµ½Ôà¾ØĞÎ
+	//	//æ·»åŠ regionåˆ°è„çŸ©å½¢
 	//	//....
-	//	//Í¨ÖªË¢ĞÂ
+	//	//é€šçŸ¥åˆ·æ–°
 	//}
 
 	//void setLargerChild(Layout* layout, displayCondition condition) {
@@ -450,124 +443,57 @@ public:
 	//	this->larger_layout = layout;
 	//	//if (layout != nullptr)layout->parent=this;
 	//	this->larger_condition = condition;
-	//	//Ìí¼Óregionµ½Ôà¾ØĞÎ
+	//	//æ·»åŠ regionåˆ°è„çŸ©å½¢
 	//	//resetRegion
-	//	//Ìí¼Óregionµ½Ôà¾ØĞÎ
+	//	//æ·»åŠ regionåˆ°è„çŸ©å½¢
 	//	//....
-	//	//Í¨ÖªË¢ĞÂ
+	//	//é€šçŸ¥åˆ·æ–°
 	//}
 };
 
-class Canvas :public Layout {
-
+class Canvas : public Layout
+{
 };
 
-class Stack:public Layout {
-
+class Stack : public Layout
+{
 };
 
-class Grid {
-
+class Grid
+{
 };
 
-namespace DOM {
-	struct Any
-	{
-		Any(void) : m_tpIndex(std::type_index(typeid(void))) {}
-		Any(const Any& that) : m_ptr(that.Clone()), m_tpIndex(that.m_tpIndex) {}
-		Any(Any&& that) : m_ptr(std::move(that.m_ptr)), m_tpIndex(that.m_tpIndex) {}
+namespace DOM
+{
+	auto child(Layout *layout) { return item(&layoutProperties::child, layout); }
+	auto extendedWidth(){return item(&layoutProperties::pending_width,true);}
+	auto extendedHeight(){return item(&layoutProperties::pending_height,true);}
 
-		//´´½¨ÖÇÄÜÖ¸ÕëÊ±£¬¶ÔÓÚÒ»°ãµÄÀàĞÍ£¬Í¨¹ıstd::decayÀ´ÒÆ³ıÒıÓÃºÍcv·û£¬´Ó¶ø»ñÈ¡Ô­Ê¼ÀàĞÍ
-		template<typename U, class = typename std::enable_if<!std::is_same<typename std::decay<U>::type, Any>::value, U>::type> Any(U&& value) : m_ptr(new Derived < typename std::decay<U>::type>(forward<U>(value))),
-			m_tpIndex(type_index(typeid(typename std::decay<U>::type))) {}
+	auto left(int px) { return item(&layoutProperties::left, new int(px)); }
+	auto top(int px) { return item(&layoutProperties::top, new int(px)); }
+	auto right(int px) { return item(&layoutProperties::right, new int(px)); }
+	auto bottom(int px) { return item(&layoutProperties::bottom, new int(px)); }
+	auto width(int px) { return item(&layoutProperties::width, new int(px)); }
+	auto height(int px) { return item(&layoutProperties::height, new int(px)); }
+	auto maxWidth(int px){ return item(&layoutProperties::max_width,new int(px));}
+	auto minWidth(int px){ return item(&layoutProperties::min_width,new int(px));}
+	auto maxHeight(int px){ return item(&layoutProperties::max_height,new int(px));}
+	auto minHeight(int px){ return item(&layoutProperties::min_height,new int(px));}
 
-		bool IsNull() const { return !bool(m_ptr); }
+	auto left(float px) { return item(&layoutProperties::scale_left, new float(px)); }
+	auto top(float px) { return item(&layoutProperties::scale_top, new float(px)); }
+	auto right(float px) { return item(&layoutProperties::scale_right, new float(px)); }
+	auto bottom(float px) { return item(&layoutProperties::scale_bottom, new float(px)); }
+	auto width(float px) { return item(&layoutProperties::scale_width, new float(px)); }
+	auto height(float px) { return item(&layoutProperties::scale_height, new float(px)); }
+	auto maxWidth(float px){ return item(&layoutProperties::scale_max_width,new float(px));}
+	auto minWidth(float px){ return item(&layoutProperties::scale_min_width,new float(px));}
+	auto maxHeight(float px){ return item(&layoutProperties::scale_max_height,new float(px));}
+	auto minHeight(float px){ return item(&layoutProperties::scale_min_height,new float(px));}
 
-		template<class U> bool Is() const
-		{
-			return m_tpIndex == type_index(typeid(U));
-		}
+	//auto topNeighbor(Layout* layout){return new ComplexItem([&](layoutProperties* it){it->pending_bottom})}
 
-		//½«Any×ª»»ÎªÊµ¼ÊµÄÀàĞÍ
-		template<class U>
-		U& AnyCast()
-		{
-			if (!Is<U>())
-			{
-				cout << "can not cast " << typeid(U).name() << " to " << m_tpIndex.name() << endl;
-				throw bad_cast();
-			}
 
-			auto derived = dynamic_cast<Derived<U>*> (m_ptr.get());
-			return derived->m_value;
-		}
+} // namespace DOM
 
-		Any& operator=(const Any& a)
-		{
-			if (m_ptr == a.m_ptr)
-				return *this;
-
-			m_ptr = a.Clone();
-			m_tpIndex = a.m_tpIndex;
-			return *this;
-		}
-
-	private:
-		struct Base;
-		typedef std::unique_ptr<Base> BasePtr;
-
-		struct Base
-		{
-			virtual ~Base() {}
-			virtual BasePtr Clone() const = 0;
-		};
-
-		template<typename T>
-		struct Derived : Base
-		{
-			template<typename U>
-			Derived(U&& value) : m_value(forward<U>(value)) { }
-
-			BasePtr Clone() const
-			{
-				return BasePtr(new Derived<T>(m_value));
-			}
-
-			T m_value;
-		};
-
-		BasePtr Clone() const
-		{
-			if (m_ptr != nullptr)
-				return m_ptr->Clone();
-
-			return nullptr;
-		}
-
-		BasePtr m_ptr;
-		std::type_index m_tpIndex;
-	};
-	
-	Item left(int px) {
-
-	}
-	Item top(int px) {
-
-	}
-	Item right(int px) {
-
-	}
-	Item bottom(int px) {
-
-	}
-	Item height(int px) {
-
-	}
-	Item width(int px) {
-
-	}
-	Item child(Layout* layout) {
-
-	}
-}
 #endif
