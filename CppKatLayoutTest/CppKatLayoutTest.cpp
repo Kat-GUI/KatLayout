@@ -231,6 +231,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             //layout[2].resetRegion(&layout[0]);
             //layout[3].resetRegion(&layout[0]);
 
+
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
             //// TODO: 在此处添加使用 hdc 的任何绘图代码...
