@@ -2,7 +2,14 @@
 #define UNICODE
 #endif
 #include <windows.h>
-#include"../src/Layout.h"
+#include"../src/Widget.h"
+#include"TestWidget.h"
+#include<iostream>
+using namespace DOM;
+testWidget window={left(10),top(10),width(1),height(1),child(
+            new testWidget{left(10),top(10),right(10),bottom(10)}
+        )};
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 int main()
@@ -11,10 +18,11 @@ int main()
     const wchar_t CLASS_NAME[]  = L"Sample Window Class";
     HINSTANCE hInstance = GetModuleHandle(0);
     WNDCLASS wc = { };
-
+    wc.style          = CS_HREDRAW | CS_VREDRAW;
     wc.lpfnWndProc   = WindowProc;
     wc.hInstance     = hInstance;
     wc.lpszClassName = CLASS_NAME;
+    wc.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
 
     RegisterClass(&wc);
 
@@ -65,11 +73,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hwnd, &ps);
 
-
-
-            FillRect(hdc, &ps.rcPaint, (HBRUSH) (COLOR_WINDOW+1));
-
+            LPRECT rect=new tagRECT();
+            GetClientRect(hwnd,rect);
+            *window.data.height=rect->bottom-100;
+            *window.data.width=rect->right-100;
+            window.render(hdc);
+            window.resetRegion(Widget::Zero);
             EndPaint(hwnd, &ps);
+            std::cout<<23333<<std::endl;
         }
             return 0;
 
