@@ -5,7 +5,10 @@
 #include <typeindex>
 #include <memory>
 #include <string>
-#include "../cpp_DOM/src/DOM.h"
+#include<limits>
+#include"../cpp_DOM/src/DOM.h"
+
+#include<windows.h>
 
 struct absRegion
 {
@@ -43,22 +46,30 @@ public:
 };
 
 class MutiWidget;
-class Widget
+class Widget:public Layout
 {
 	friend MutiWidget;
-
+	bool hide=false;
 public:
-	Layout *display = nullptr;
-	absRegion region;
-	Layout data;
-
+    absRegion region;
 public:
+
+    virtual void render(HDC hdc)
+    {
+        Rectangle(hdc,region.x,region.y,region.x+region.w,region.y+region.h);
+        if(child!=nullptr)
+        {
+            child->resetRegion(this);
+            child->render(hdc);
+        }
+
+    }
+
 	static Widget *Zero;
-	Widget() : display(&data){};
+	Widget()=default;
 	Widget(DOM::initializer property)
 	{
-		DOM::moveProperty(property, &data);
-		display = &data;
+		DOM::moveProperty(property, this);
 	}
 	//留给派生类重写
     virtual float measureChildWidth()
@@ -67,23 +78,23 @@ public:
         Widget *iter = this;
         if (iter != nullptr)
         {
-            while (iter->display->neighbor_left != nullptr)
-                iter = iter->display->neighbor_left;
+            while (iter->neighbor_left != nullptr)
+                iter = iter->neighbor_left;
             while (iter != nullptr)
             {
                 iter->resetRegion(Zero);
                 val += iter->region.w;
-                iter = iter->display->neighbor_right;
+                iter = iter->neighbor_right;
             }
             iter = this;
-            while (iter->display->neighbor_top != nullptr)
-                iter = iter->display->neighbor_top;
+            while (iter->neighbor_top != nullptr)
+                iter = iter->neighbor_top;
             while (iter != nullptr)
             {
                 iter->resetRegion(Zero);
                 if (iter->region.w > val)
                     val = iter->region.w;
-                iter = iter->display->neighbor_bottom;
+                iter = iter->neighbor_bottom;
             }
         }
         return val;
@@ -94,23 +105,23 @@ public:
         Widget *iter = this;
         if (iter != nullptr)
         {
-            while (iter->display->neighbor_top != nullptr)
-                iter = iter->display->neighbor_top;
+            while (iter->neighbor_top != nullptr)
+                iter = iter->neighbor_top;
             while (iter != nullptr)
             {
                 iter->resetRegion(Zero);
                 val += iter->region.h;
-                iter = iter->display->neighbor_bottom;
+                iter = iter->neighbor_bottom;
             }
             iter = this;
-            while (iter->display->neighbor_left != nullptr)
-                iter = iter->display->neighbor_left;
+            while (iter->neighbor_left != nullptr)
+                iter = iter->neighbor_left;
             while (iter != nullptr)
             {
                 iter->resetRegion(Zero);
                 if (iter->region.h > val)
                     val = iter->region.h;
-                iter = iter->display->neighbor_right;
+                iter = iter->neighbor_right;
             }
         }
         return val;
@@ -118,180 +129,179 @@ public:
     virtual void resetRegion(Widget *parent)
     {
         //本布局隐藏时不计算
-        if (display == nullptr)
-            return;
+        if(hide)return;
 
         //设置了宽度、高度时，直接计算w h
-        if (display->width != nullptr)
-            region.w = *display->width;
-        else if (display->scale_width != nullptr)
-            region.w = parent->region.w * (*display->scale_width);
-        else if (display->pending_width)
+        if (width != nullptr)
+            region.w = *width;
+        else if (scale_width != nullptr)
+            region.w = parent->region.w * (*scale_width);
+        else if (pending_width)
             region.w = measureChildWidth();
 
         //左右都没设置，只设置了宽，那就水平居中
-        if (display->pending_left == nullptr && display->pending_right == nullptr && display->left == nullptr && display->scale_left == nullptr && display->right == nullptr && display->scale_right == nullptr && (display->width != nullptr || display->scale_width != nullptr || display->pending_width))
+        if (pending_left == nullptr && pending_right == nullptr && left == nullptr && scale_left == nullptr && right == nullptr && scale_right == nullptr && (width != nullptr || scale_width != nullptr || pending_width))
         {
             region.x = parent->region.x + (parent->region.w - region.w) / 2;
         }
 
         //设置了left、scale_left或pending_left时，计算x
-        if (parent->display->pending_width && display->pending_left == nullptr && display->pending_right == nullptr)
+        if (parent->pending_width && pending_left == nullptr && pending_right == nullptr)
         {
             region.x = parent->region.x;
         }
-        else if (display->pending_left != nullptr)
+        else if (pending_left != nullptr)
         {
-            region.x = display->pending_left->region.x + display->pending_left->region.w;
+            region.x = pending_left->region.x + pending_left->region.w;
         }
-        else if (display->left != nullptr)
+        else if (left != nullptr)
         {
-            region.x = parent->region.x + *display->left;
+            region.x = parent->region.x + *left;
         }
-        else if (display->scale_left != nullptr)
+        else if (scale_left != nullptr)
         {
-            region.x = parent->region.x + parent->region.w * (*display->scale_left);
+            region.x = parent->region.x + parent->region.w * (*scale_left);
         }
 
         //设置了right、scale_right时，如果同时设置了width或scale_width（此时left无效），计算x；否则结合left计算w
         //计算pending_right pending_bottom需要region.h region.w,故放在后面计算
-        if (display->pending_right == nullptr && display->pending_left == nullptr)
+        if (pending_right == nullptr && pending_left == nullptr)
         {
-            if (display->right != nullptr)
+            if (right != nullptr)
             {
-                if (display->width != nullptr || display->scale_width != nullptr || display->pending_width)
+                if (width != nullptr || scale_width != nullptr || pending_width)
                 {
-                    region.x = parent->region.x + parent->region.w - region.w - *display->right;
+                    region.x = parent->region.x + parent->region.w - region.w - *right;
                 }
                 else
                 {
-                    region.w = parent->region.x + parent->region.w - region.x - *display->right;
+                    region.w = parent->region.x + parent->region.w - region.x - *right;
                 }
             }
-            else if (display->scale_right != nullptr)
+            else if (scale_right != nullptr)
             {
-                if (display->width != nullptr || display->scale_width != nullptr || display->pending_height)
+                if (width != nullptr || scale_width != nullptr || pending_height)
                 {
-                    region.x = parent->region.x + parent->region.w - region.w - parent->region.w * (*display->scale_right);
+                    region.x = parent->region.x + parent->region.w - region.w - parent->region.w * (*scale_right);
                 }
                 else
                 {
-                    region.w = parent->region.x + parent->region.w - region.x - parent->region.w * (*display->scale_right);
+                    region.w = parent->region.x + parent->region.w - region.x - parent->region.w * (*scale_right);
                 }
             }
         }
 
-        if (display->height != nullptr)
-            region.h = *display->height;
-        else if (display->scale_height != nullptr)
-            region.h = parent->region.h * (*display->scale_height);
-        else if (display->pending_height)
+        if (height != nullptr)
+            region.h = *height;
+        else if (scale_height != nullptr)
+            region.h = parent->region.h * (*scale_height);
+        else if (pending_height)
             region.h = measureChildHeight();
 
         //上下都没设置，只设置了高，那就垂直居中
-        if (display->pending_top == nullptr && display->pending_bottom == nullptr && display->top == nullptr && display->scale_top == nullptr && display->bottom == nullptr && display->scale_bottom == nullptr && (display->height != nullptr || display->scale_height != nullptr || display->pending_height))
+        if (pending_top == nullptr && pending_bottom == nullptr && top == nullptr && scale_top == nullptr && bottom == nullptr && scale_bottom == nullptr && (height != nullptr || scale_height != nullptr || pending_height))
         {
             region.y = parent->region.y + (parent->region.h - region.h) / 2;
         }
 
         //设置了top、scale_top或pending_top时，计算y
-        if (parent->display->pending_height && display->pending_top == nullptr && display->pending_bottom == nullptr)
+        if (parent->pending_height && pending_top == nullptr && pending_bottom == nullptr)
         {
             region.y = parent->region.y;
         }
-        else if (display->pending_top != nullptr)
+        else if (pending_top != nullptr)
         {
-            region.y = display->pending_top->region.y + display->pending_top->region.h;
+            region.y = pending_top->region.y + pending_top->region.h;
         }
-        if (display->top != nullptr)
+        if (top != nullptr)
         {
-            region.y = parent->region.y + *display->top;
+            region.y = parent->region.y + *top;
         }
-        else if (display->scale_top != nullptr)
+        else if (scale_top != nullptr)
         {
-            region.y = parent->region.y + parent->region.h * (*display->scale_top);
+            region.y = parent->region.y + parent->region.h * (*scale_top);
         }
 
         //设置了bottom、scale_bottom时，如果同时设置了height或scale_height（此时top无效），计算x；否则结合top计算h
-        if (display->pending_bottom == nullptr && display->pending_top == nullptr)
+        if (pending_bottom == nullptr && pending_top == nullptr)
         {
-            if (display->bottom != nullptr)
+            if (bottom != nullptr)
             {
-                if (display->height != nullptr || display->scale_height != nullptr || display->pending_height)
+                if (height != nullptr || scale_height != nullptr || pending_height)
                 {
-                    region.y = parent->region.y + parent->region.h - region.h - *display->bottom;
+                    region.y = parent->region.y + parent->region.h - region.h - *bottom;
                 }
                 else
                 {
-                    region.h = parent->region.y + parent->region.h - region.y - *display->bottom;
+                    region.h = parent->region.y + parent->region.h - region.y - *bottom;
                 }
             }
-            else if (display->scale_bottom != nullptr)
+            else if (scale_bottom != nullptr)
             {
-                if (display->height != nullptr || display->scale_height != nullptr || display->pending_height)
+                if (height != nullptr || scale_height != nullptr || pending_height)
                 {
-                    region.y = parent->region.y + parent->region.h - region.h - parent->region.h * (*display->scale_bottom);
+                    region.y = parent->region.y + parent->region.h - region.h - parent->region.h * (*scale_bottom);
                 }
                 else
                 {
-                    region.h = parent->region.y + parent->region.h - region.y - parent->region.h * (*display->scale_bottom);
+                    region.h = parent->region.y + parent->region.h - region.y - parent->region.h * (*scale_bottom);
                 }
             }
         }
 
         //限制尺寸在min和max之间，没有设置min max则不限制
-        if (display->max_width != nullptr)
+        if (max_width != nullptr)
         {
-            if (region.w > *display->max_width)
-                region.w = *display->max_width;
+            if (region.w > *max_width)
+                region.w = *max_width;
         }
-        else if (display->scale_max_width != nullptr)
+        else if (scale_max_width != nullptr)
         {
-            if (region.w / parent->region.w > *display->scale_max_width)
-                region.w = parent->region.w * (*display->scale_max_width);
-        }
-
-        if (display->min_width != nullptr)
-        {
-            if (region.w < *display->min_width)
-                region.w = *display->min_width;
-        }
-        else if (display->scale_min_width != nullptr)
-        {
-            if (region.w / parent->region.w < *display->scale_min_width)
-                region.w = parent->region.w * (*display->scale_min_width);
+            if (region.w / parent->region.w > *scale_max_width)
+                region.w = parent->region.w * (*scale_max_width);
         }
 
-        if (display->max_height != nullptr)
+        if (min_width != nullptr)
         {
-            if (region.h > *display->max_height)
-                region.h = *display->max_height;
+            if (region.w < *min_width)
+                region.w = *min_width;
         }
-        else if (display->scale_max_height != nullptr)
+        else if (scale_min_width != nullptr)
         {
-            if (region.h / parent->region.h > *display->scale_max_height)
-                region.h = parent->region.h * (*display->scale_max_height);
+            if (region.w / parent->region.w < *scale_min_width)
+                region.w = parent->region.w * (*scale_min_width);
         }
 
-        if (display->min_height != nullptr)
+        if (max_height != nullptr)
         {
-            if (region.h < *display->min_height)
-                region.h = *display->min_height;
+            if (region.h > *max_height)
+                region.h = *max_height;
         }
-        else if (display->scale_min_height != nullptr)
+        else if (scale_max_height != nullptr)
         {
-            if (region.h / parent->region.h < *display->scale_min_height)
-                region.h = parent->region.h * (*display->scale_min_height);
+            if (region.h / parent->region.h > *scale_max_height)
+                region.h = parent->region.h * (*scale_max_height);
+        }
+
+        if (min_height != nullptr)
+        {
+            if (region.h < *min_height)
+                region.h = *min_height;
+        }
+        else if (scale_min_height != nullptr)
+        {
+            if (region.h / parent->region.h < *scale_min_height)
+                region.h = parent->region.h * (*scale_min_height);
         }
 
         //调整right、bottom待定的layout 因为计算需要得知w h所以放在尺寸限制计算之后
-        if (!display->pending_width && display->pending_right != nullptr)
+        if (!pending_width && pending_right != nullptr)
         {
-            region.x = display->pending_right->region.x - region.w;
+            region.x = pending_right->region.x - region.w;
         }
-        if (!display->pending_height && display->pending_bottom != nullptr)
+        if (!pending_height && pending_bottom != nullptr)
         {
-            region.y = display->pending_bottom->region.y - region.h;
+            region.y = pending_bottom->region.y - region.h;
         }
     }
 	enum class Edge
@@ -326,39 +336,39 @@ public:
 	//设置和目标layout紧挨。例如Edge::left是将本实例的左边和目标layout的右边对齐
 	//同时目标layout成为本实例的pending_left
 	//本实例成为目标layout的neighbor_right
-	//void setNeighbor(Layout* layout, Edge edge) {
-	//	switch (edge) {
-	//	case Edge::left:
-	//		if(pending_left!=nullptr)delete pending_left;
-	//		pending_left=layout;
-	//		layout->neighbor_right=this;
-	//		//parent= layout->parent;
-	//		break;
-	//	case Edge::top:
-	//		if(pending_top!=nullptr)delete pending_top;
-	//		pending_top=layout;
-	//		layout->neighbor_bottom=this;
-	//		//parent = layout->parent;
-	//		break;
-	//	case Edge::right:
-	//		if(pending_right!=nullptr)delete pending_right;
-	//		pending_right=layout;
-	//		layout->neighbor_left=this;
-	//		//parent = layout->parent;
-	//		break;
-	//	case Edge::bottom:
-	//		if(pending_bottom!=nullptr)delete pending_bottom;
-	//		pending_bottom=layout;
-	//		layout->neighbor_top=this;
-	//		//parent = layout->parent;
-	//		break;
-	//	}
-	//	//添加region到脏矩形
-	//	//resetRegion
-	//	//添加region到脏矩形
-	//	//....
-	//	//通知刷新
-	//}
+	void setNeighbor(Widget* widget, Edge edge) {
+		switch (edge) {
+		case Edge::left:
+			if(pending_left!=nullptr)delete pending_left;
+			pending_left=widget;
+			widget->neighbor_right=this;
+			//parent= layout->parent;
+			break;
+		case Edge::top:
+			if(pending_top!=nullptr)delete pending_top;
+			pending_top=widget;
+			widget->neighbor_bottom=this;
+			//parent = layout->parent;
+			break;
+		case Edge::right:
+			if(pending_right!=nullptr)delete pending_right;
+			pending_right=widget;
+			widget->neighbor_left=this;
+			//parent = layout->parent;
+			break;
+		case Edge::bottom:
+			if(pending_bottom!=nullptr)delete pending_bottom;
+			pending_bottom=widget;
+			widget->neighbor_top=this;
+			//parent = layout->parent;
+			break;
+		}
+		//添加region到脏矩形
+		//resetRegion
+		//添加region到脏矩形
+		//....
+		//通知刷新
+	}
 
 };
 Widget *Widget::Zero = new Widget();
@@ -368,58 +378,55 @@ using displayCondition = std::function<bool(Size)>;
 class MutiWidget : public Widget
 {
 	displayCondition smaller_condition, larger_condition;
-	Layout smaller_layout, larger_layout;
+	Widget *smaller,*larger,*normal;
 	virtual void resetRegion(Widget *parent) override
 	{
-		//选择合适的layout
-		Size size;
-		bool flag = false;
-		size.height = region.h;
-		size.width = region.w;
-		size.scale_height = region.h / parent->region.h;
-		size.scale_width = region.w / parent->region.w;
-		if (larger_condition)
-		{
-			if (larger_condition(size))
-			{
-				display = &larger_layout;
-				flag = true;
-			}
-		}
-		if (smaller_condition)
-		{
-			if (smaller_condition(size))
-			{
-				display = &smaller_layout;
-				flag = true;
-			}
-		}
-		if (!flag)
-			display = &data;
-
-		Widget::resetRegion(parent);
+        //选择合适的layout
+        Size size;
+        bool flag = false;
+        size.height = region.h;
+        size.width = region.w;
+        size.scale_height = region.h / parent->region.h;
+        size.scale_width = region.w / parent->region.w;
+        if (larger_condition)
+        {
+            if (larger_condition(size))
+            {
+                flag = true;
+                larger->resetRegion(parent);
+            }
+        }
+        if (smaller_condition)
+        {
+            if (smaller_condition(size))
+            {
+                flag = true;
+                smaller->resetRegion(parent);
+            }
+        }
+        if (!flag)normal->resetRegion(parent);;
 	}
 
 public:
-	MutiWidget(Layout smaller, displayCondition smaller_condition, Layout normal,
-			   Layout larger, displayCondition larger_condition)
+	MutiWidget(Widget* smaller, displayCondition smaller_condition, Widget* normal,
+			   Widget* larger, displayCondition larger_condition)
 	{
-		this->data = normal;
-		this->smaller_layout = smaller;
-		this->larger_layout = larger;
+		
+		this->smaller = smaller;
+		this->larger = larger;
 		this->larger_condition = larger_condition;
 		this->smaller_condition = smaller_condition;
 	}
-	MutiWidget(Layout smaller, displayCondition smaller_condition, Layout normal)
+	MutiWidget(Widget* smaller, displayCondition smaller_condition, Widget* normal)
 	{
-		this->data = normal;
-		this->smaller_layout = smaller;
+		this->normal = normal;
+		this->smaller = smaller;
 		this->smaller_condition = smaller_condition;
 	}
-	MutiWidget(Layout normal, Layout larger, displayCondition larger_condition)
+	MutiWidget(Widget* normal, Widget* larger, displayCondition larger_condition)
 	{
-		this->data = normal;
-		this->larger_layout = larger;
+		this->normal = normal;
+		this->larger = larger;
 		this->larger_condition = larger_condition;
 	}
 
@@ -448,49 +455,163 @@ public:
 	//}
 };
 
+class ScrollField:public Widget
+{
+public:
+    ScrollField(){}
+
+};
+
 class Canvas : public Widget
 {
+
 };
 
 class Stack : public Widget
 {
+
 };
 
-class Grid
+class Grid:public Widget
 {
+    int colm,rowm;
+    struct Container
+    {
+        Widget* widget;
+        Container(int row,int col,int spanRow,int spanCol,Widget* widget):
+        row(row),col(col),spanRow(spanRow),spanCol(spanCol){
+            this->widget->child=widget;
+            widget->left=new int(0);
+            widget->top=new int(0);
+            widget->width=new int(0);
+            widget->height=new int(0);
+        }
+        int row,col,spanRow,spanCol;
+    };
+    std::vector<Container*> content;
+    std::vector<std::vector<int>> table;
+    Container* get(int col,int row) {
+        return content[table[col][row]];
+    }
+public:
+    virtual void render(HDC hdc)override
+    {
+        Rectangle(hdc,region.x,region.y,region.x+region.w,region.y+region.h);
+        for(auto c:content)
+        {
+            if(c!=nullptr)
+            {
+                c->widget->resetRegion(this);
+                c->widget->render(hdc);
+            }
+        }
+    }
+    void resetRegion(Widget* parent)override
+    {
+        Widget::resetRegion(parent);
+        int unitW= region.w / colm;
+        int unitH= region.h / rowm;
+        for(auto c:content)
+        {
+            Layout* d=c->widget;
+            *d->left=c->col*unitW;
+            *d->top=c->row*unitH;
+            *d->width=c->spanCol*unitW;
+            *d->height=c->spanRow*unitH;
+        }
+    }
+
+    Grid(int columns,int rows,DOM::initializer property)
+    {
+        colm=columns;
+        rowm=rows;
+        DOM::moveProperty(property,this);
+
+        table.resize(rows);
+        for (int i = 0; i < rows; i++)
+            table[i].resize(columns);
+    }
+
+    void setChild(int col,int row,int spanCol,int spanRow,Widget* widget)
+    {
+        if(col>-1 && col < colm && row > -1 && row < rowm &&
+            spanCol>-1 && spanCol < colm && spanRow > -1 && spanRow < row)
+        {
+            content.push_back(new Container(col,row,spanRow,spanCol,widget));
+            int index=content.size();
+            for(int y=col;y<col+spanCol;y++)
+                for(int x=row;x<row+spanRow;x++)
+                {
+                    delete get(x,y)->widget;
+                    delete get(x,y);
+                    content[table[x][y]]=nullptr;
+                    table[y][x]=index;
+                }
+
+        }
+    }
+
+    void setChild(int col,int row,Widget* widget)
+    {
+        setChild(col,row,1,1,widget);
+    }
+
 };
 
-namespace DOM
-{
-	auto child(Widget *layout) { return item(&Layout::child, layout); }
-	auto extendedWidth(){return item(&Layout::pending_width,true);}
-	auto extendedHeight(){return item(&Layout::pending_height,true);}
-
-	auto left(int px) { return item(&Layout::left, new int(px)); }
-	auto top(int px) { return item(&Layout::top, new int(px)); }
-	auto right(int px) { return item(&Layout::right, new int(px)); }
-	auto bottom(int px) { return item(&Layout::bottom, new int(px)); }
-	auto width(int px) { return item(&Layout::width, new int(px)); }
-	auto height(int px) { return item(&Layout::height, new int(px)); }
-	auto maxWidth(int px){ return item(&Layout::max_width,new int(px));}
-	auto minWidth(int px){ return item(&Layout::min_width,new int(px));}
-	auto maxHeight(int px){ return item(&Layout::max_height,new int(px));}
-	auto minHeight(int px){ return item(&Layout::min_height,new int(px));}
-
-	auto left(float px) { return item(&Layout::scale_left, new float(px)); }
-	auto top(float px) { return item(&Layout::scale_top, new float(px)); }
-	auto right(float px) { return item(&Layout::scale_right, new float(px)); }
-	auto bottom(float px) { return item(&Layout::scale_bottom, new float(px)); }
-	auto width(float px) { return item(&Layout::scale_width, new float(px)); }
-	auto height(float px) { return item(&Layout::scale_height, new float(px)); }
-	auto maxWidth(float px){ return item(&Layout::scale_max_width,new float(px));}
-	auto minWidth(float px){ return item(&Layout::scale_min_width,new float(px));}
-	auto maxHeight(float px){ return item(&Layout::scale_max_height,new float(px));}
-	auto minHeight(float px){ return item(&Layout::scale_min_height,new float(px));}
-
-	//auto topNeighbor(Layout* layout){return new ComplexItem([&](layoutProperties* it){it->pending_bottom})}
-
-
-} // namespace DOM
+//namespace DOM
+//{
+//	auto child(Widget *layout) { return item(&Layout::child, layout); }
+//	auto extendedWidth(){return item(&Layout::pending_width,true);}
+//	auto extendedHeight(){return item(&Layout::pending_height,true);}
+//
+//	auto left(int px) { return item(&Layout::left, new int(px)); }
+//	auto top(int px) { return item(&Layout::top, new int(px)); }
+//	auto right(int px) { return item(&Layout::right, new int(px)); }
+//	auto bottom(int px) { return item(&Layout::bottom, new int(px)); }
+//	auto width(int px) { return item(&Layout::width, new int(px)); }
+//	auto height(int px) { return item(&Layout::height, new int(px)); }
+//	auto maxWidth(int px){ return item(&Layout::max_width,new int(px));}
+//	auto minWidth(int px){ return item(&Layout::min_width,new int(px));}
+//	auto maxHeight(int px){ return item(&Layout::max_height,new int(px));}
+//	auto minHeight(int px){ return item(&Layout::min_height,new int(px));}
+//
+//	auto margin(int left,int top,int right,int bottom){
+//	    return new ComplexItem<Layout>([=](Layout* it){
+//	        it->left=new int(left);
+//	        it->top=new int(top);
+//	        it->right=new int(right);
+//	        it->bottom=new int(bottom);
+//	    });
+//	}
+//	auto margin(int px){
+//	    return margin(px,px,px,px);
+//	}
+//
+//	auto left(float scale) { return item(&Layout::scale_left, new float(scale)); }
+//	auto top(float scale) { return item(&Layout::scale_top, new float(scale)); }
+//	auto right(float scale) { return item(&Layout::scale_right, new float(scale)); }
+//	auto bottom(float scale) { return item(&Layout::scale_bottom, new float(scale)); }
+//	auto width(float scale) { return item(&Layout::scale_width, new float(scale)); }
+//	auto height(float scale) { return item(&Layout::scale_height, new float(scale)); }
+//	auto maxWidth(float scale){ return item(&Layout::scale_max_width,new float(scale));}
+//	auto minWidth(float scale){ return item(&Layout::scale_min_width,new float(scale));}
+//	auto maxHeight(float scale){ return item(&Layout::scale_max_height,new float(scale));}
+//	auto minHeight(float scale){ return item(&Layout::scale_min_height,new float(scale));}
+//
+//	auto child(int col,int row,int spanCol,int spanRow,Widget* widget)
+//    {
+//	    return new ComplexItem<Grid>([=](Grid* it){
+//	       it->setChild(col,row,spanCol,spanRow,widget);
+//	    });
+//    }
+//
+//    auto child(int col,int row,Widget* widget)
+//    {
+//        return new ComplexItem<Grid>([=](Grid* it){
+//            it->setChild(col,row,widget);
+//        });
+//    }
+//
+//}
 
 #endif

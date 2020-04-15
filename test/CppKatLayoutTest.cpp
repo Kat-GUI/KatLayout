@@ -3,13 +3,9 @@
 #endif
 #include <windows.h>
 #include"../src/Widget.h"
-#include"TestWidget.h"
 #include<iostream>
 using namespace DOM;
-testWidget window={left(10),top(10),width(1),height(1),child(
-            new testWidget{left(10),top(10),right(10),bottom(10)}
-        )};
-
+Widget window;
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 int main()
@@ -46,6 +42,7 @@ int main()
         return 0;
     }
 
+
     ShowWindow(hwnd, SW_SHOW);
 
     // Run the message loop.
@@ -72,15 +69,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hwnd, &ps);
-
             LPRECT rect=new tagRECT();
             GetClientRect(hwnd,rect);
-            *window.data.height=rect->bottom-100;
-            *window.data.width=rect->right-100;
+            *window.height=rect->bottom-5;
+            *window.width=rect->right-5;
             window.render(hdc);
             window.resetRegion(Widget::Zero);
             EndPaint(hwnd, &ps);
-            std::cout<<23333<<std::endl;
         }
             return 0;
 
