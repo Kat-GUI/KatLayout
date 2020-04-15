@@ -25,25 +25,96 @@ class Widget;
 class Layout
 {
 public:
-	friend Widget;
-	//表示上下左右紧贴的对象 nullptr时相应距离变量无效
-	int *left = nullptr, *top = nullptr, *right = nullptr, *bottom = nullptr;
-	//这四个变量供计算使用
-	Widget *pending_top = nullptr, *pending_left = nullptr, *pending_right = nullptr, *pending_bottom = nullptr;
-	//这四个变量供绘图时使用，用来找到四个方向紧贴自己的邻居。neighbor_xxx与pending_xxx形成双向链表
-	//同时也避免计算时两个紧贴的layout形成“空岛”（A告知在B右边、B告知在A左边）造成无法计算坐标的现象
-	Widget *neighbor_top = nullptr, *neighbor_left = nullptr, *neighbor_right = nullptr, *neighbor_bottom = nullptr;
-	//表示大小由子对象决定，pending为true时限制行为（max、min）依然有效
-	bool pending_width = false, pending_height = false;
-	int *width = nullptr, *max_width = nullptr, *min_width = nullptr;
-	int *height = nullptr, *max_height = nullptr, *min_height = nullptr;
-
-	float *scale_left = nullptr, *scale_top = nullptr, *scale_right = nullptr, *scale_bottom = nullptr;
-	float *scale_width = nullptr, *scale_max_width = nullptr, *scale_min_width = nullptr;
-	float *scale_height = nullptr, *scale_max_height = nullptr, *scale_min_height = nullptr;
-	//Layout* display = nullptr;/*,*parent=nullptr;*/ //考虑到多布局时一个布局可能同时是几个布局的子对象（这几个布局不会同时出现）故移除此变量
-	Widget *child = nullptr;
+    Layout(){
+        //region.setObsolete();
+    }
+	Layout* child;
+	struct Region{
+	    const float obsolete=std::numeric_limits<int>::lowest();
+	    float x,y,w,h,r,b;
+        void setObsolete(){
+            x=y=w=h=r=b=obsolete;
+        }
+	}region;
+    static const float empty;
+	struct Axis{
+	    float head=empty;
+	    float body=empty;
+	    float tail=empty;
+	    bool scaleHead,scaleBody,scaleTail;
+	    bool extended=false;//为真时，body也要设为非empty
+	    struct Limit{
+	        float max=empty;
+	        float min=empty;
+	    }limit;
+	}x,y;
+    float limit(const Axis &axis,const float& distance){
+        float ans=distance;
+        if(axis.limit.max!=empty && distance > axis.limit.max)ans=axis.limit.max;
+        if(axis.limit.min!=empty && distance < axis.limit.min)ans=axis.limit.min;
+        return ans;
+    }
+    virtual float getExetndedParentFiller(const Axis &axis){
+        float ans = 0;
+        //蛤？父类长宽由我定？
+        if((axis.extended||axis.scaleBody||axis.scaleHead||axis.scaleTail)){
+            //我也不知道啊
+            if(child!=nullptr)  /*去我子类那问吧*/
+                ans = child->getExetndedParentFiller(axis);
+            else                /*草（日语） 我没子类了*/
+                throw "无法计算坐标";
+        }
+        else{
+            //我知道
+            ans = limit(axis,axis.body);
+        }
+        return ans + axis.head + axis.tail;//加上缝隙
+    }
+    virtual void calcuAxis(Axis &axis,float &begin,float &distance,float &end,
+            const float& parent_begin,const float& parent_distance){
+        float tmp;
+        //直接穷举 通俗易懂
+        if(axis.head==empty && axis.body!=empty && axis.tail==empty){
+            //[   ],body,[   ]
+            tmp = axis.scaleBody ? axis.body*parent_distance : axis.body;
+            distance = limit(axis,axis.extended ? getExetndedParentFiller(axis) : tmp);
+            begin = (parent_distance - distance)/2;
+            end = begin;
+        }
+        else if(axis.head==empty && axis.body!=empty && axis.tail!=empty){
+            //[   ],body,tail
+            tmp = axis.scaleBody ? axis.body*parent_distance : axis.body;
+            distance = limit(axis,axis.extended ? getExetndedParentFiller(axis) : tmp);
+            end = axis.scaleTail ? axis.tail*parent_distance : axis.tail;
+            begin = parent_distance - distance - end;
+        }
+        else if(axis.head != empty && axis.body!=empty && axis.tail==empty){
+            //head,body,[   ]
+            tmp = axis.scaleBody ? axis.body*parent_distance : axis.body;
+            distance = limit(axis,axis.extended ? getExetndedParentFiller(axis) : tmp);
+            begin = axis.scaleHead ? axis.head*parent_distance : axis.head;
+            end = parent_distance - distance - begin;
+        }
+        else if(axis.head!=empty && axis.body==empty && axis.tail!=empty){
+            //head,[   ],tail
+            begin = axis.scaleHead ? axis.head*parent_distance : axis.head;
+            end = axis.scaleTail ? axis.tail*parent_distance : axis.tail;
+            float tmp = parent_distance - begin - end;
+            distance = limit(axis,axis.extended ? getExetndedParentFiller(axis) : tmp);
+            if(tmp!=distance) {
+                begin += (tmp - distance)/2;
+                end += (tmp - distance)/2;
+            }
+        }
+    }
+    void calcuRegion(Layout* container){
+        child->region.setObsolete();
+        calcuAxis(x,region.x,region.w,region.r,container->region.x,container->region.w);
+        calcuAxis(y,region.y,region.h,region.b,container->region.y,container->region.h);
+	}
+#undef empty
 };
+const float Layout::empty = std::numeric_limits<float>::lowest();
 
 class MutiWidget;
 class Widget:public Layout
