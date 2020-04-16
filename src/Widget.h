@@ -123,7 +123,7 @@ private:
         end+=parent_begin;
     }
 public:
-    void calcuRegion(Layout* container){
+    virtual void calcuRegion(Layout* container){
         child->region.setObsolete();
         calcuAxis(x,region.x,region.w,region.r,container->region.x,container->region.w);
         calcuAxis(y,region.y,region.h,region.b,container->region.y,container->region.h);
@@ -141,10 +141,43 @@ public:
         }
     }
 };
+
+using displayCondition = std::function<bool(Size)>;
+//这个类不能为extended
+class Dynamic:public Widget{
+    bool isDefault=true;
+public:
+    std::list<std::pair<Widget*,displayCondition>> candidate;
+    const displayCondition empty;
+    const displayCondition caseElse= [&](Size){ isDefault=true;return true;};
+    virtual void calcuRegion(Layout* container)override{
+        Layout::calcuRegion(container);
+        Size size;
+        size.width=region.w;
+        size.height=region.h;
+        size.scale_height=region.h/container->region.h;
+        size.scale_width=region.w/container->region.w;
+        isDefault=false;
+        bool flag=true;
+        Widget* default_widget=nullptr;
+        for(auto p:candidate){
+            if(p.second(size)){
+                if(isDefault){
+                    default_widget=p.first;
+                    continue;
+                }
+                child=p.first;
+                flag=false;
+            }
+        }
+        if(flag)child=default_widget;
+    }
+
+};
 //
 //Widget *Widget::Zero = new Widget();
 //
-//using displayCondition = std::function<bool(Size)>;
+
 //
 //class MutiWidget : public Widget
 //{

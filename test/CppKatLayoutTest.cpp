@@ -13,15 +13,22 @@ int main()
     window.x.head=10;
     window.y.head=10;
     window.id="window";
+    Dynamic container;
     Widget exten,exten2,filler;
+    container.x.head=5;
+    container.x.tail=5;
+    container.y.head=5;
+    container.y.tail=5;
+    window.child=&container;
 
     exten.id="exten";
     exten.x.body=0;
     exten.y.body=0;
     exten.x.extended=true;
     exten.y.extended=true;
-    window.child=&exten;
-
+    container.candidate.push_back(std::make_pair(&exten,[](Size size){return size.width<400;}));
+    container.candidate.push_back(std::make_pair(nullptr,[](Size size){return size.width>400&&size.width<600;}));
+    container.candidate.push_back(std::make_pair(&exten,container.caseElse));
     exten2.id="exten2";
     exten2.x.head=10;
     exten2.x.tail=10;
@@ -124,11 +131,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             HDC hdc = BeginPaint(hwnd, &ps);
             LPRECT rect=new tagRECT();
             GetClientRect(hwnd,rect);
-            window.region.x=0;
-            window.region.y=0;
-            window.region.w=rect->right;
-            window.region.h=rect->bottom;
-            window.render(hdc);
+            Widget* w=&window;
+            w->region.x=0;
+            w->region.y=0;
+            w->region.w=rect->right;
+            w->region.h=rect->bottom;
+            w->render(hdc);
             EndPaint(hwnd, &ps);
         }
             return 0;
