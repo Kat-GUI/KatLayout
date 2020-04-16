@@ -10,6 +10,59 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 int main()
 {
+    window.x.head=10;
+    window.y.head=10;
+    window.id="window";
+    Widget exten,exten2,filler;
+
+    exten.id="exten";
+    exten.x.body=0;
+    exten.y.body=0;
+    exten.x.extended=true;
+    exten.y.extended=true;
+    window.child=&exten;
+
+    exten2.id="exten2";
+    exten2.x.head=10;
+    exten2.x.tail=10;
+    exten2.y.head=10;
+    exten2.y.tail=10;
+    exten2.x.body=0;
+    exten2.y.body=0;
+    exten2.x.extended=true;
+    exten2.y.extended=true;
+    exten.child=&exten2;
+
+    filler.id="filler";
+    filler.x.body=300;
+    filler.y.body=300;
+    filler.x.head=30;
+    filler.y.head=30;
+    filler.x.tail=50;
+    filler.y.tail=50;
+    exten2.child=&filler;
+
+//    Widget child1,child2,center,filler;
+//    child1.x.head=20;
+//    child1.y.head=20;
+//    child1.x.tail=20;
+//    child1.y.tail=20;
+//    child1.x.limit.min=300;
+//    child1.y.limit.min=300;
+//    child1.x.limit.max=600;
+//    child1.y.limit.max=600;
+//    window.child=&child1;
+//
+//    child2.x.body=300;
+//    child2.y.body=300;
+//    child1.child=&child2;
+//
+//    center.x.extended=true;
+//    center.y.extended=true;
+//    child2.child=&center;
+
+
+
     // Register the window class.
     const wchar_t CLASS_NAME[]  = L"Sample Window Class";
     HINSTANCE hInstance = GetModuleHandle(0);
@@ -30,7 +83,7 @@ int main()
             L"Learn to Program Windows",    // Window text
             WS_OVERLAPPEDWINDOW,            // Window style
             // Size and position
-            CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+            CW_USEDEFAULT, CW_USEDEFAULT, 500, 500,
             NULL,       // Parent window
             NULL,       // Menu
             hInstance,  // Instance handle
@@ -71,10 +124,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             HDC hdc = BeginPaint(hwnd, &ps);
             LPRECT rect=new tagRECT();
             GetClientRect(hwnd,rect);
-            *window.height=rect->bottom-5;
-            *window.width=rect->right-5;
+            window.region.x=0;
+            window.region.y=0;
+            window.region.w=rect->right;
+            window.region.h=rect->bottom;
             window.render(hdc);
-            window.resetRegion(Widget::Zero);
             EndPaint(hwnd, &ps);
         }
             return 0;
