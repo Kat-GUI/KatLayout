@@ -9,12 +9,6 @@
 #include"../cpp_DOM/src/DOM.h"
 
 #include<windows.h>
-
-struct absRegion
-{
-	float x = 0, y = 0, w = 0, h = 0;
-};
-
 struct Size
 {
 	int height, width;
@@ -25,19 +19,21 @@ class Widget;
 class Layout
 {
 public:
-    std::string id;
     Layout(){
         x.type=Axis::X;
         y.type=Axis::Y;
     }
-	Layout* child=nullptr;
-	struct Region{
-	    const float obsolete=std::numeric_limits<int>::lowest();
-	    float x,y,w,h,r,b;
+    std::string id;
+    Layout* child=nullptr;
+    struct Region{
+        const float obsolete=std::numeric_limits<int>::lowest();
+        float x,y,w,h,r,b;
         void setObsolete(){
 //            x=y=w=h=r=b=obsolete;
         }
-	}region;
+    }region;
+private:
+
     static const float empty;
 	struct Axis{
 	    enum Enum{X,Y}type;
@@ -59,7 +55,7 @@ private:
         if(axis.limit.min!=empty && distance < axis.limit.min)ans=axis.limit.min;
         return ans;
     }
-public:
+protected:
     virtual float getExetndedParentFiller(Axis::Enum type){
         float ans = 0;
         const Axis &axis = type==Axis::X ? x : y;
@@ -77,7 +73,7 @@ public:
         }
         return ans + (axis.head==empty ? 0:axis.head) + (axis.tail==empty ? 0:axis.tail);//加上缝隙
     }
-private:
+protected:
     void calcuAxis(Axis &axis,float &begin,float &distance,float &end,
             const float& parent_begin,const float& parent_distance){
         float tmp;
@@ -128,6 +124,64 @@ public:
         calcuAxis(x,region.x,region.w,region.r,container->region.x,container->region.w);
         calcuAxis(y,region.y,region.h,region.b,container->region.y,container->region.h);
 	}
+
+	//下面到undef之前都是烦人的口水代码
+#define ASSERT static_assert(std::is_same<T,int>::value||std::is_same<T,float>::value,"The template parameter must be int or float.")
+	template<typename T>
+	void setLeft(T int_or_float){
+        ASSERT;
+        x.scaleHead=std::is_same<T,float>::value;
+        x.head=int_or_float;
+    }
+    template<typename T>
+    void setTop(T int_or_float){
+        ASSERT;
+        y.scaleHead=std::is_same<T,float>::value;
+        y.head=int_or_float;
+    }
+    template<typename T>
+    void setRight(T int_or_float){
+        ASSERT;
+        x.scaleTail=std::is_same<T,float>::value;
+        x.tail=int_or_float;
+    }
+    template<typename T>
+    void setBottom(T int_or_float){
+        ASSERT;
+        y.scaleTail=std::is_same<T,float>::value;
+        y.tail=int_or_float;
+    }
+    template<typename T>
+    void setHeight(T int_or_float){
+        ASSERT;
+        y.scaleBody=std::is_same<T,float>::value;
+        y.body=int_or_float;
+        y.extended=false;
+    }
+    template<typename T>
+    void setWidth(T int_or_float){
+        ASSERT;
+        x.scaleBody=std::is_same<T,float>::value;
+        x.body=int_or_float;
+        x.extended=false;
+    }
+    float getTop(){ return y.head; }
+    float getRight(){ return x.tail; }
+    float getBottom(){ return y.tail; }
+    float getWidth(){ return x.body; }
+    float getHeight(){ return y.body; }
+    float getLeft(){ return x.head; }
+    bool isLeftScale(){ return x.scaleHead; }
+    bool isTopScale(){ return y.scaleHead; }
+    bool isBottomScale(){ return y.scaleTail; }
+    bool isRightScale(){ return x.scaleTail; }
+    bool isWidthScale(){ return x.scaleBody; }
+    bool isHeightScale(){ return y.scaleBody; }
+    void setWidthExtend(bool val){ x.extended=val; x.body=0;}
+    void setHeightExtend(bool val){ y.extended=val; y.body=0;}
+    bool getWidthExtend(){ return x.extended; }
+    bool getHeightExtend(){ return y.extended; }
+#undef ASSERT
 };
 const float Layout::empty = std::numeric_limits<float>::lowest();
 
@@ -139,6 +193,30 @@ public:
             child->calcuRegion(this);
             ((Widget*)child)->render(hdc);
         }
+    }
+};
+
+class Dock:public Widget{
+public:
+    enum Enum{Left=1,Top=1<<1,Right=1<<2,Bottom=1<<3};
+    template<typename X,typename Y>
+    Dock(int dockEdge,X x,Y y){
+        if((dockEdge&Dock::Left)==Dock::Left)setLeft(x);
+        if((dockEdge&Dock::Top)==Dock::Top)setTop(y);
+        if((dockEdge&Dock::Right)==Dock::Right)setRight(x);
+        if((dockEdge&Dock::Bottom)==Dock::Bottom)setRight(y);
+        setHeightExtend(true);
+        setWidthExtend(true);
+    }
+
+};
+
+class Fixed:public Dock{
+public:
+    template<typename X,typename Y,typename W,typename H>
+    Fixed(int dockEdge,X x,Y y,W width,H height):Dock::Dock(dockEdge,x,y){
+        setWidth(width);
+        setHeight(height);
     }
 };
 
@@ -174,7 +252,7 @@ public:
     }
 
 };
-
+template<typename T>
 class Grid:public Widget{
     int colm=0,rowm=0;
     struct Container{
@@ -185,6 +263,9 @@ class Grid:public Widget{
     };
     std::vector<Container> content;
     std::vector<std::vector<int>> table;
+    void createNewContainer(const int &col,const int &row,const int &spanCol,const int &spanRow,Widget* widget){
+
+    }
 public:
     Grid(int columns,int rows):colm(columns),rowm(rows){
         table.resize(rows);
@@ -202,31 +283,57 @@ public:
     void setChild(int col,int row,int spanCol,int spanRow,Widget* widget){
 //        if(col>-1 && col < colm && row > -1 && row < rowm &&
 //            spanCol>-1 && spanCol < colm && spanRow > -1 && spanRow < row){
-            auto tmp = new Widget();
-            tmp->x.scaleHead=true;
-            tmp->x.scaleBody=true;
-            tmp->y.scaleHead=true;
-            tmp->y.scaleBody=true;
-            tmp->x.head=1.0/colm*col;
-            tmp->x.body=1.0/colm*spanCol;
-            tmp->y.head=1.0/rowm*row;
-            tmp->y.body=1.0/rowm*spanRow;
-            tmp->child=widget;
-            content.push_back(Container(col,row,spanRow,spanCol,tmp));
-            int index=content.size();
-            for(int y=row;y<row+spanRow;y++)
-                for(int x=col;x<col+spanCol;x++){
-                    int &i=table[y][x];
-                    if(i>-1){
-                        delete content[i].widget;
-                        content[i].widget=nullptr;
-                    }
-                    i=index;
+        createNewContainer(col,row,spanCol,spanRow,widget);
+        int index=content.size()-1;
+        for(int y=row;y<row+spanRow;y++){
+            for(int x=col;x<col+spanCol;x++){
+                int &i=table[y][x];
+                if(i>-1){
+                    delete content[i].widget;
+                    content[i].widget=nullptr;
                 }
+                i=index;
+            }
+        }
 
 //        }
     }
+    ~Grid(){
+        for(auto p:content)delete p.widget;
+    }
 };
+
+template<>
+void Grid<Fixed>::createNewContainer(const int &col, const int &row, const int &spanCol, const int &spanRow, Widget *widget) {
+    auto tmp = new Fixed(Dock::Left+Dock::Top,1.0/colm*col,1.0/rowm*row,1.0/colm*spanCol,1.0/rowm*spanRow);
+    tmp->child=widget;
+    content.push_back(Container(col,row,spanRow,spanCol,tmp));
+}
+
+template<>
+void Grid<Dock>::createNewContainer(const int &col, const int &row, const int &spanCol, const int &spanRow, Widget *widget) {
+    auto tmp = new Fixed(Dock::Left+Dock::Top,1.0/colm*col,1.0/rowm*row,1.0/colm*spanCol,1.0/rowm*spanRow);
+    tmp->child=widget;
+    content.push_back(Container(col,row,spanRow,spanCol,tmp));
+}
+
+
+
+class Panel:public Widget{
+public:
+    std::list<Widget*> childs;
+    virtual void render(HDC hdc)override {
+        Widget::render(hdc);
+        for(auto c:childs){
+            if(c==nullptr)continue;
+            c->calcuRegion(this);
+            c->render(hdc);
+        }
+    }
+};
+
+
+
 //
 //Widget *Widget::Zero = new Widget();
 //

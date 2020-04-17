@@ -49,27 +49,30 @@ void test2(){
 }
 int main()
 {
+//    Fixed f(Fixed::Left+Fixed::Top,100,100);
     window.x.head=10;
     window.y.head=10;
-    window.id="window";
+    window.setLeft("asd");
+//    window.id="window";
 
-    Grid grid(3,3);
-    grid.x.head=100;
-    grid.x.tail=50;
-    grid.y.tail=50;
-    grid.y.head=50;
-    Widget w1,w2;
-    w1.x.head=10;
-    w1.x.tail=10;
-    w1.y.head=10;
-    w1.y.tail=10;
-    w2.x.head=20;
-    w2.x.tail=20;
-    w2.y.head=20;
-    w2.y.tail=20;
-    grid.setChild(1,1,2,2,&w1);
-    grid.setChild(0,0,3,1,&w2);
-    window.child=&grid;
+//    Grid grid(3,3);
+//    grid.x.head=100;
+//    grid.x.tail=50;
+//    grid.y.tail=50;
+//    grid.y.head=50;
+//    Widget w1,w2;
+//    w1.x.head=10;
+//    w1.x.tail=10;
+//    w1.y.head=10;
+//    w1.y.tail=10;
+//    w2.x.head=20;
+//    w2.x.tail=20;
+//    w2.y.head=20;
+//    w2.y.tail=20;
+//    grid.setChild(1,1,2,2,&w1);
+//    grid.setChild(0,0,3,2,&w2);
+//    grid.setChild(2,2,1,1,&w1);
+//    window.child=&grid;
 
 //    Widget child1,child2,center,filler;
 //    child1.x.head=20;
