@@ -7,12 +7,7 @@
 using namespace DOM;
 Widget window;
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-
-int main()
-{
-    window.x.head=10;
-    window.y.head=10;
-    window.id="window";
+void test1(){
     Dynamic container;
     Widget exten,exten2,filler;
     container.x.head=5;
@@ -48,6 +43,33 @@ int main()
     filler.x.tail=50;
     filler.y.tail=50;
     exten2.child=&filler;
+}
+void test2(){
+
+}
+int main()
+{
+    window.x.head=10;
+    window.y.head=10;
+    window.id="window";
+
+    Grid grid(3,3);
+    grid.x.head=100;
+    grid.x.tail=50;
+    grid.y.tail=50;
+    grid.y.head=50;
+    Widget w1,w2;
+    w1.x.head=10;
+    w1.x.tail=10;
+    w1.y.head=10;
+    w1.y.tail=10;
+    w2.x.head=20;
+    w2.x.tail=20;
+    w2.y.head=20;
+    w2.y.tail=20;
+    grid.setChild(1,1,2,2,&w1);
+    grid.setChild(0,0,3,1,&w2);
+    window.child=&grid;
 
 //    Widget child1,child2,center,filler;
 //    child1.x.head=20;

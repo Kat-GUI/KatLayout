@@ -174,6 +174,59 @@ public:
     }
 
 };
+
+class Grid:public Widget{
+    int colm=0,rowm=0;
+    struct Container{
+        Widget* widget;
+        int col,row,span_col,span_row;
+        Container(int c,int r,int sc,int sr,Widget* w)
+            :col(c),row(r),span_col(sc),span_row(sr),widget(w){}
+    };
+    std::vector<Container> content;
+    std::vector<std::vector<int>> table;
+public:
+    Grid(int columns,int rows):colm(columns),rowm(rows){
+        table.resize(rows);
+        for(auto& row:table)row=std::vector<int>(columns,-1);
+    }
+    virtual void render(HDC hdc)override {
+        Widget::render(hdc);
+        for(auto c:content){
+            if(c.widget!=nullptr){
+                c.widget->calcuRegion(this);
+                c.widget->render(hdc);
+            }
+        }
+    }
+    void setChild(int col,int row,int spanCol,int spanRow,Widget* widget){
+//        if(col>-1 && col < colm && row > -1 && row < rowm &&
+//            spanCol>-1 && spanCol < colm && spanRow > -1 && spanRow < row){
+            auto tmp = new Widget();
+            tmp->x.scaleHead=true;
+            tmp->x.scaleBody=true;
+            tmp->y.scaleHead=true;
+            tmp->y.scaleBody=true;
+            tmp->x.head=1.0/colm*col;
+            tmp->x.body=1.0/colm*spanCol;
+            tmp->y.head=1.0/rowm*row;
+            tmp->y.body=1.0/rowm*spanRow;
+            tmp->child=widget;
+            content.push_back(Container(col,row,spanRow,spanCol,tmp));
+            int index=content.size();
+            for(int y=row;y<row+spanRow;y++)
+                for(int x=col;x<col+spanCol;x++){
+                    int &i=table[y][x];
+                    if(i>-1){
+                        delete content[i].widget;
+                        content[i].widget=nullptr;
+                    }
+                    i=index;
+                }
+
+//        }
+    }
+};
 //
 //Widget *Widget::Zero = new Widget();
 //
