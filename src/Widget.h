@@ -6,7 +6,9 @@
 #include <memory>
 #include <string>
 #include<limits>
-#include"../cpp_DOM/src/DOM.h"
+#include<vector>
+#include<math.h>
+//#include"../cpp_DOM/src/DOM.h"
 
 #include<windows.h>
 struct Size
@@ -62,9 +64,9 @@ protected:
         //蛤？父类长宽由我定？
         if((axis.extended||axis.scaleBody||axis.scaleHead||axis.scaleTail)){
             //我也不知道啊
-            if(child!=nullptr)  /*去我子类那问吧*/
+            if(child!=nullptr)  //去我子类那问吧
                 ans = child->getExetndedParentFiller(type);
-            else                /*草（日语） 我没子类了*/
+            else                //草（日语） 我没子类了
                 throw "无法计算坐标";
         }
         else{
@@ -176,7 +178,13 @@ const float Layout::empty = std::numeric_limits<float>::lowest();
 class Widget:public Layout {
 public:
     virtual void render(HDC hdc) {
-        Rectangle(hdc, region.x, region.y, region.x + region.w, region.y + region.h);
+        RECT r;
+        r.left=region.x;
+        r.top=region.y;
+        r.right=region.w+region.x;
+        r.bottom=region.h+region.y;
+
+        FrameRect(hdc,&r,CreateSolidBrush(RGB(std::rand()%200,std::rand()%200,std::rand()%200)));
         if (child != nullptr) {
             child->calcuRegion(this);
             ((Widget*)child)->render(hdc);
@@ -191,6 +199,10 @@ public:
     template<typename L,typename T,typename R,typename B>
     Margin(L left,T top,R right,B bottom){
         setLeft(left);setTop(top);setRight(right);setBottom(bottom);
+    }
+    template<typename T>
+    Margin(T px_or_scale){
+        setLeft(px_or_scale);setTop(px_or_scale);setRight(px_or_scale);setBottom(px_or_scale);
     }
     template<typename T>
     void setLeft(T int_or_float){
@@ -230,7 +242,7 @@ public:
         if((dockEdge&Dock::Left)==Dock::Left)setLeft(x);
         if((dockEdge&Dock::Top)==Dock::Top)setTop(y);
         if((dockEdge&Dock::Right)==Dock::Right)setRight(x);
-        if((dockEdge&Dock::Bottom)==Dock::Bottom)setRight(y);
+        if((dockEdge&Dock::Bottom)==Dock::Bottom)setBottom(y);
         setHeightExtend(true);
         setWidthExtend(true);
     }
@@ -331,15 +343,8 @@ public:
 
 
 
-
 template<typename T>
-class Grid:public Widget{
-public:
-    Grid(){ static_assert(std::is_same<T,Fixed>::value||std::is_same<T,Dock>::value,"template parameter here must be Dock or Fixed"); }
-};
-
-template<>
-class Grid<Fixed>:public Fixed{
+class Grid:public Fixed{
     std::vector<float> scaleX,scaleY;
     std::vector<int> unitX,unitY;
     enum adjuestMode{Scale,Unit,Fix}mode;
@@ -359,16 +364,16 @@ class Grid<Fixed>:public Fixed{
     }
 public:
     template<typename X,typename Y,typename W,typename H>
-    Grid(int columns,int rows,Dock dockEdge,X x,Y y,W width,H height)
-    :colm(columns),rowm(rows),Fixed::Fixed(dockEdge,x,y,width,height){
+    Grid(int columns,int rows,int dockEdge,X x,Y y,W width,H height)
+        :colm(columns),rowm(rows),Fixed::Fixed(dockEdge,x,y,width,height){
         table.resize(rows);
         for(auto& row:table)row=std::vector<int>(columns,-1);
         mode=Fix;
     }
+
     template<typename X,typename Y>
-    Grid(std::vector<int> rows_length,std::vector<int> columns_length,Dock dockEdge,X x,Y y)
-    :Fixed::Fixed(dockEdge,x,y,getSum(rows_length),getSum(columns_length)){
-        unitX.resize(columns_length.size());
+    Grid(std::vector<int> rows_length,std::vector<int> columns_length,int dockEdge,X x,Y y)
+        :Fixed::Fixed(dockEdge,x,y,getSum(columns_length),getSum(rows_length)){
         int sum=0;
         unitX.push_back(0);
         for(int i=0;i<columns_length.size();i++){
@@ -376,40 +381,43 @@ public:
             unitX.push_back(sum);
         }
         sum=0;
-        unitY.resize(rows_length.size());
         unitY.push_back(0);
         for(int i=0;i<rows_length.size();i++){
             sum+=rows_length[i];
             unitY.push_back(sum);
         }
+        table.resize(unitY.size()-1);
+        for(auto& row:table)row=std::vector<int>(unitX.size()-1,-1);
         mode=Unit;
     }
+
     template<typename X,typename Y,typename W,typename H>
-    Grid(std::vector<float> rows_scale,std::vector<float> columns_scale,Dock dockEdge,X x,Y y,W width,H height)
-    :Fixed::Fixed(dockEdge,x,y,width,height){
-        scaleX.resize(columns_scale.size());
-        int sum=0;
+    Grid(std::vector<float> columns_scale,std::vector<float> rows_scale,int dockEdge,X x,Y y,W width,H height)
+        :Fixed::Fixed(dockEdge,x,y,width,height){
+        float sum=0;
         scaleX.push_back(0);
         for(int i=0;i<columns_scale.size();i++){
             sum+=columns_scale[i];
             scaleX.push_back(sum);
         }
         sum=0;
-        scaleY.resize(rows_scale.size());
         scaleY.push_back(0);
         for(int i=0;i<rows_scale.size();i++){
             sum+=rows_scale[i];
-            unitY.push_back(sum);
+            scaleY.push_back(sum);
         }
+        table.resize(scaleY.size()-1);
+        for(auto& row:table)row=std::vector<int>(scaleX.size()-1,-1);
         mode=Scale;
     }
+
     template<typename X,typename Y>
-    Grid(std::vector<int> unit_length,Dock dockEdge,X x,Y y)
-    :Grid(unit_length,unit_length,dockEdge,x,y){}
+    Grid(std::vector<int> unit_length,int dockEdge,X x,Y y)
+        :Grid(unit_length,unit_length,dockEdge,x,y){}
+
     template<typename X,typename Y,typename W,typename H>
-    Grid(std::vector<float> unit_scale,Dock dockEdge,X x,Y y,W width,H height)
-    :Grid(unit_scale,unit_scale,dockEdge,x,y,width,height){}
-    
+    Grid(std::vector<float> unit_scale,int dockEdge,X x,Y y,W width,H height)
+        :Grid(unit_scale,unit_scale,dockEdge,x,y,width,height){}
 
     virtual void render(HDC hdc)override {
         Fixed::render(hdc);
@@ -420,19 +428,20 @@ public:
             }
         }
     }
+
     void setChild(int col,int row,int spanCol,int spanRow,Widget* widget){
 //        if(col>-1 && col < colm && row > -1 && row < rowm &&
 //            spanCol>-1 && spanCol < colm && spanRow > -1 && spanRow < row){
         Fixed* tmp;
         switch(mode){
             case Fix:
-                tmp = new Fixed(1.0/colm*col,1.0/rowm*row,1.0/colm*spanCol,1.0/rowm*spanRow);
+                tmp = new Fixed((float)1.0/colm*col,(float)1.0/rowm*row,(float)1.0/colm*spanCol,(float)1.0/rowm*spanRow);
                 break;
             case Unit:
-                tmp = new Fixed(unitX[col],unitY[row],unitX[col+spanCol],unitY[row+spanRow]);
+                tmp = new Fixed(unitX[col],unitY[row],unitX[col+spanCol]-unitX[col],unitY[row+spanRow]-unitY[row]);
                 break;
             case Scale:
-                tmp = new Fixed(scaleX[col],scaleY[row],scaleX[col+spanCol],scaleY[row+spanRow]);
+                tmp = new Fixed(scaleX[col],scaleY[row],scaleX[col+spanCol]-scaleX[col],scaleY[row+spanRow]-scaleY[row]);
                 break;
         }
         tmp->child=widget;

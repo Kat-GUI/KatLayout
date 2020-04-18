@@ -4,7 +4,7 @@
 #include <windows.h>
 #include"../src/Widget.h"
 #include<iostream>
-using namespace DOM;
+//using namespace DOM;
 Widget* window;
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 //void test1(){
@@ -47,9 +47,19 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 void test2(){
 
 }
+auto a = new Margin(10);
+auto grid = new Grid<Fixed>( {0.25f,0.25f,0.5f},{0.25f,0.25f,0.5f},Dock::Right+Dock::Bottom,10,10,400,400);
 int main()
 {
     window=new Margin(10,10,10,10);
+
+
+    grid->setChild(0,1,3,1,a);
+    grid->setChild(0,0,1,1,new Margin(10));
+    grid->setChild(2,0,1,1,new Margin(10));
+    window->child=grid;
+
+
 //    Fixed f(Fixed::Left+Fixed::Top,100,100);
 //    window.x.head=10;
 //    window.y.head=10;
@@ -104,7 +114,7 @@ int main()
     wc.lpfnWndProc   = WindowProc;
     wc.hInstance     = hInstance;
     wc.lpszClassName = CLASS_NAME;
-    wc.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
+    wc.hbrBackground  = CreateSolidBrush(RGB(220,220,220));
 
     RegisterClass(&wc);
 
