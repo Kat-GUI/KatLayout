@@ -32,7 +32,7 @@ public:
 //            x=y=w=h=r=b=obsolete;
         }
     }region;
-private:
+protected:
 
     static const float empty;
 	struct Axis{
@@ -117,6 +117,7 @@ protected:
         }
         begin+=parent_begin;
         end+=parent_begin;
+        //TODO:安排整体缩放
     }
 public:
     virtual void calcuRegion(Layout* container){
@@ -126,7 +127,7 @@ public:
 	}
 
 	//下面到undef之前都是烦人的口水代码
-#define ASSERT static_assert(std::is_same<T,int>::value||std::is_same<T,float>::value,"The template parameter must be int or float.")
+#define ASSERT static_assert(std::is_same<T,int>::value||std::is_same<T,float>::value||std::is_same<T,double>::value,"The template parameter must be int or float.")
 	template<typename T>
 	void setLeft(T int_or_float){
         ASSERT;
@@ -152,24 +153,11 @@ public:
         y.tail=int_or_float;
     }
     template<typename T>
-    void setHeight(T int_or_float){
-        ASSERT;
-        y.scaleBody=std::is_same<T,float>::value;
-        y.body=int_or_float;
-        y.extended=false;
-    }
-    template<typename T>
-    void setWidth(T int_or_float){
-        ASSERT;
-        x.scaleBody=std::is_same<T,float>::value;
-        x.body=int_or_float;
-        x.extended=false;
-    }
+
     float getTop(){ return y.head; }
     float getRight(){ return x.tail; }
     float getBottom(){ return y.tail; }
-    float getWidth(){ return x.body; }
-    float getHeight(){ return y.body; }
+
     float getLeft(){ return x.head; }
     bool isLeftScale(){ return x.scaleHead; }
     bool isTopScale(){ return y.scaleHead; }
@@ -181,7 +169,7 @@ public:
     void setHeightExtend(bool val){ y.extended=val; y.body=0;}
     bool getWidthExtend(){ return x.extended; }
     bool getHeightExtend(){ return y.extended; }
-#undef ASSERT
+
 };
 const float Layout::empty = std::numeric_limits<float>::lowest();
 
@@ -196,11 +184,49 @@ public:
     }
 };
 
-class Dock:public Widget{
+enum Dock{Left=1,Top=1<<1,Right=1<<2,Bottom=1<<3};
+
+class Margin:public Widget{
 public:
-    enum Enum{Left=1,Top=1<<1,Right=1<<2,Bottom=1<<3};
+    template<typename L,typename T,typename R,typename B>
+    Margin(L left,T top,R right,B bottom){
+        setLeft(left);setTop(top);setRight(right);setBottom(bottom);
+    }
+    template<typename T>
+    void setLeft(T int_or_float){
+        ASSERT;
+        x.head=int_or_float;
+        x.scaleHead=std::is_same<T,float>::value;
+    }
+    template<typename T>
+    void setTop(T int_or_float){
+        ASSERT;
+        y.head=int_or_float;
+        y.scaleHead=std::is_same<T,float>::value;
+    }
+    float getLeft(){ return x.head; }
+    float getTop(){ return y.head; }
+    template<typename T>
+    void setRight(T int_or_float){
+        ASSERT;
+        x.tail=int_or_float;
+        x.scaleTail=std::is_same<T,float>::value;
+    }
+    template<typename T>
+    void setBottom(T int_or_float){
+        ASSERT;
+        y.tail=int_or_float;
+        y.scaleTail=std::is_same<T,float>::value;
+    }
+    float getRight(){ return x.tail; }
+    float getBottom(){ return y.tail; }
+};
+
+class Extend:public Widget{
+public:
+
     template<typename X,typename Y>
-    Dock(int dockEdge,X x,Y y){
+    Extend(int dockEdge,X x,Y y){
         if((dockEdge&Dock::Left)==Dock::Left)setLeft(x);
         if((dockEdge&Dock::Top)==Dock::Top)setTop(y);
         if((dockEdge&Dock::Right)==Dock::Right)setRight(x);
@@ -208,21 +234,72 @@ public:
         setHeightExtend(true);
         setWidthExtend(true);
     }
-
+    Extend(int dockEdge){
+        Extend(dockEdge,0,0);
+    }
+    template<typename T>
+    void setX(T int_or_float){
+        ASSERT;
+        if(x.head==Layout::empty){
+            x.tail=int_or_float;
+            x.scaleTail=std::is_same<T,float>::value;
+        }else{
+            x.head=int_or_float;
+            x.scaleHead=std::is_same<T,float>::value;
+        }
+        x.extended=false;
+    }
+    template<typename T>
+    void setY(T int_or_float){
+        ASSERT;
+        if(y.head==Layout::empty){
+            y.tail=int_or_float;
+            y.scaleTail=std::is_same<T,float>::value;
+        }else{
+            y.head=int_or_float;
+            y.scaleHead=std::is_same<T,float>::value;
+        }
+        y.extended=false;
+    }
+    float getX(){ return x.head==Layout::empty ? x.tail : x.head; }
+    float getY(){ return y.head==Layout::empty ? y.tail : y.head; }
 };
 
-class Fixed:public Dock{
+class Fixed:public Extend{
 public:
+    Fixed()=default;
     template<typename X,typename Y,typename W,typename H>
-    Fixed(int dockEdge,X x,Y y,W width,H height):Dock::Dock(dockEdge,x,y){
+    Fixed(int dockEdge,X x,Y y,W width,H height):Extend::Extend(dockEdge,x,y){
         setWidth(width);
         setHeight(height);
     }
+    template<typename X,typename Y,typename W,typename H>
+    Fixed(X x,Y y,W width,H height):Extend::Extend(Dock::Left+Dock::Top,x,y){
+        setWidth(width);
+        setHeight(height);
+    }
+    template<typename T>
+    void setHeight(T int_or_float){
+        ASSERT;
+        y.scaleBody=std::is_same<T,float>::value;
+        y.body=int_or_float;
+        y.extended=false;
+    }
+    template<typename T>
+    void setWidth(T int_or_float){
+        ASSERT;
+        x.scaleBody=std::is_same<T,float>::value;
+        x.body=int_or_float;
+        x.extended=false;
+    }
+    float getWidth(){ return x.body; }
+    float getHeight(){ return y.body; }
 };
 
 using displayCondition = std::function<bool(Size)>;
+
 //这个类不能为extended
-class Dynamic:public Widget{
+class Dynamic:public Fixed{
     bool isDefault=true;
 public:
     std::list<std::pair<Widget*,displayCondition>> candidate;
@@ -250,10 +327,22 @@ public:
         }
         if(flag)child=default_widget;
     }
-
 };
+
+
+
+
 template<typename T>
 class Grid:public Widget{
+public:
+    Grid(){ static_assert(std::is_same<T,Fixed>::value||std::is_same<T,Dock>::value,"template parameter here must be Dock or Fixed"); }
+};
+
+template<>
+class Grid<Fixed>:public Fixed{
+    std::vector<float> scaleX,scaleY;
+    std::vector<int> unitX,unitY;
+    enum adjuestMode{Scale,Unit,Fix}mode;
     int colm=0,rowm=0;
     struct Container{
         Widget* widget;
@@ -263,16 +352,67 @@ class Grid:public Widget{
     };
     std::vector<Container> content;
     std::vector<std::vector<int>> table;
-    void createNewContainer(const int &col,const int &row,const int &spanCol,const int &spanRow,Widget* widget){
-
+    int getSum(std::vector<int>&set){
+        int l=0;
+        for(int a:set)l+=a;
+        return l;
     }
 public:
-    Grid(int columns,int rows):colm(columns),rowm(rows){
+    template<typename X,typename Y,typename W,typename H>
+    Grid(int columns,int rows,Dock dockEdge,X x,Y y,W width,H height)
+    :colm(columns),rowm(rows),Fixed::Fixed(dockEdge,x,y,width,height){
         table.resize(rows);
         for(auto& row:table)row=std::vector<int>(columns,-1);
+        mode=Fix;
     }
+    template<typename X,typename Y>
+    Grid(std::vector<int> rows_length,std::vector<int> columns_length,Dock dockEdge,X x,Y y)
+    :Fixed::Fixed(dockEdge,x,y,getSum(rows_length),getSum(columns_length)){
+        unitX.resize(columns_length.size());
+        int sum=0;
+        unitX.push_back(0);
+        for(int i=0;i<columns_length.size();i++){
+            sum+=columns_length[i];
+            unitX.push_back(sum);
+        }
+        sum=0;
+        unitY.resize(rows_length.size());
+        unitY.push_back(0);
+        for(int i=0;i<rows_length.size();i++){
+            sum+=rows_length[i];
+            unitY.push_back(sum);
+        }
+        mode=Unit;
+    }
+    template<typename X,typename Y,typename W,typename H>
+    Grid(std::vector<float> rows_scale,std::vector<float> columns_scale,Dock dockEdge,X x,Y y,W width,H height)
+    :Fixed::Fixed(dockEdge,x,y,width,height){
+        scaleX.resize(columns_scale.size());
+        int sum=0;
+        scaleX.push_back(0);
+        for(int i=0;i<columns_scale.size();i++){
+            sum+=columns_scale[i];
+            scaleX.push_back(sum);
+        }
+        sum=0;
+        scaleY.resize(rows_scale.size());
+        scaleY.push_back(0);
+        for(int i=0;i<rows_scale.size();i++){
+            sum+=rows_scale[i];
+            unitY.push_back(sum);
+        }
+        mode=Scale;
+    }
+    template<typename X,typename Y>
+    Grid(std::vector<int> unit_length,Dock dockEdge,X x,Y y)
+    :Grid(unit_length,unit_length,dockEdge,x,y){}
+    template<typename X,typename Y,typename W,typename H>
+    Grid(std::vector<float> unit_scale,Dock dockEdge,X x,Y y,W width,H height)
+    :Grid(unit_scale,unit_scale,dockEdge,x,y,width,height){}
+    
+
     virtual void render(HDC hdc)override {
-        Widget::render(hdc);
+        Fixed::render(hdc);
         for(auto c:content){
             if(c.widget!=nullptr){
                 c.widget->calcuRegion(this);
@@ -283,7 +423,20 @@ public:
     void setChild(int col,int row,int spanCol,int spanRow,Widget* widget){
 //        if(col>-1 && col < colm && row > -1 && row < rowm &&
 //            spanCol>-1 && spanCol < colm && spanRow > -1 && spanRow < row){
-        createNewContainer(col,row,spanCol,spanRow,widget);
+        Fixed* tmp;
+        switch(mode){
+            case Fix:
+                tmp = new Fixed(1.0/colm*col,1.0/rowm*row,1.0/colm*spanCol,1.0/rowm*spanRow);
+                break;
+            case Unit:
+                tmp = new Fixed(unitX[col],unitY[row],unitX[col+spanCol],unitY[row+spanRow]);
+                break;
+            case Scale:
+                tmp = new Fixed(scaleX[col],scaleY[row],scaleX[col+spanCol],scaleY[row+spanRow]);
+                break;
+        }
+        tmp->child=widget;
+        content.push_back(Container(col,row,spanRow,spanCol,tmp));
         int index=content.size()-1;
         for(int y=row;y<row+spanRow;y++){
             for(int x=col;x<col+spanCol;x++){
@@ -303,19 +456,6 @@ public:
     }
 };
 
-template<>
-void Grid<Fixed>::createNewContainer(const int &col, const int &row, const int &spanCol, const int &spanRow, Widget *widget) {
-    auto tmp = new Fixed(Dock::Left+Dock::Top,1.0/colm*col,1.0/rowm*row,1.0/colm*spanCol,1.0/rowm*spanRow);
-    tmp->child=widget;
-    content.push_back(Container(col,row,spanRow,spanCol,tmp));
-}
-
-template<>
-void Grid<Dock>::createNewContainer(const int &col, const int &row, const int &spanCol, const int &spanRow, Widget *widget) {
-    auto tmp = new Fixed(Dock::Left+Dock::Top,1.0/colm*col,1.0/rowm*row,1.0/colm*spanCol,1.0/rowm*spanRow);
-    tmp->child=widget;
-    content.push_back(Container(col,row,spanRow,spanCol,tmp));
-}
 
 
 
@@ -577,5 +717,5 @@ public:
 //    }
 //
 //}
-
+#undef ASSERT
 #endif
