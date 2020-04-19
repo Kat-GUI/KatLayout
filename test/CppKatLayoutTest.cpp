@@ -49,15 +49,14 @@ void test2(){
 }
 using namespace std;
 auto a = new Margin(10);
-auto container = new Widget();
+
 int main()
 {
     window=new Margin(10,10,10,10);
 
-    container->setHeightExtend(true);
-    container->setWidthExtend(true);
+    auto container = new Extended(Vertical::Top, 10, 500);
     //auto grid= new Fixed(10,10,100,100);
-    auto grid = new Grid(vector<int>{50,50,50},vector<int>{100,50,60});
+    auto grid = new Grid(vector<int>{50,50,50},vector<float>{0.2,0.3,0.5});
     grid->setChild(0,1,2,2,a);
     grid->setChild(0,0,new Margin(10));
     grid->setChild(2,0,new Margin(10));

@@ -193,7 +193,9 @@ public:
     }
 };
 
-enum Dock{Left=1,Top=1<<1,Right=1<<2,Bottom=1<<3};
+
+enum class Horizontal{Left,Center,Right};
+enum class Vertical{Top,Center,Bottom};
 
 class Margin:public Widget{
 public:
@@ -234,22 +236,68 @@ public:
     float getRight(){ return x.tail; }
     float getBottom(){ return y.tail; }
 };
-
-class Extend:public Widget{
+class Extended: public Widget{
 public:
-    Extend()=default;
+    Extended()=default;
+    template<typename X,typename T,typename B>
+    Extended(Horizontal horizontalDock, X x, T top, B bottom){
+        switch(horizontalDock){
+            case Horizontal::Left:  setLeft(x);break;
+            case Horizontal::Right: setRight(x);break;
+        }
+        setTop(top);
+        setBottom(bottom);
+        setWidthExtend(true);
+    }
+    template<typename X,typename H>
+    Extended(Horizontal horizontalDock, X x, H height){
+        switch(horizontalDock){
+            case Horizontal::Left:  setLeft(x);break;
+            case Horizontal::Right: setRight(x);break;
+        }
+        y.body=height;
+        y.scaleBody=std::is_same<H,float>::value;
+        setWidthExtend(true);
+    }
+
+    template<typename Y,typename L,typename R>
+    Extended(Vertical verticalDock, Y y, L left, R right){
+        switch(verticalDock){
+            case Vertical::Top:    setTop(x);break;
+            case Vertical::Bottom: setBottom(x);break;
+        }
+        setLeft(left);
+        setRight(right);
+        setHeightExtend(true);
+    }
+    template<typename Y,typename W>
+    Extended(Vertical verticalDock, Y y, W width){
+        switch(verticalDock){
+            case Vertical::Top:    setTop(y);break;
+            case Vertical::Bottom: setBottom(y);break;
+        }
+        x.body=width;
+        x.scaleBody=std::is_same<W,float>::value;
+        setHeightExtend(true);
+    }
+
     template<typename X,typename Y>
-    Extend(int dockEdge,X x,Y y){
-        if((dockEdge&Dock::Left)==Dock::Left)setLeft(x);
-        if((dockEdge&Dock::Top)==Dock::Top)setTop(y);
-        if((dockEdge&Dock::Right)==Dock::Right)setRight(x);
-        if((dockEdge&Dock::Bottom)==Dock::Bottom)setBottom(y);
+    Extended(Horizontal horizontalDock, Vertical verticalDock, X x, Y y){
+        switch(horizontalDock){
+            case Horizontal::Left:setLeft(x);break;
+            case Horizontal::Right:setRight(x);break;
+        }
+        switch(verticalDock){
+            case Vertical::Top:setTop(y);break;
+            case Vertical::Bottom:setBottom(y);break;
+        }
         setHeightExtend(true);
         setWidthExtend(true);
     }
-    Extend(int dockEdge){
-        Extend(dockEdge,0,0);
+    Extended(Horizontal horizontalDock, Vertical verticalDock){
+        Extended(horizontalDock, verticalDock, 0, 0);
     }
+
     template<typename T>
     void setX(T int_or_float){
         ASSERT;
@@ -274,20 +322,20 @@ public:
         }
         y.extended=false;
     }
+    //TODO:增加get/set Width Height,处理当使用Width/Height时getX getY返回不正确的结果的问题
     float getX(){ return x.head==Layout::empty ? x.tail : x.head; }
     float getY(){ return y.head==Layout::empty ? y.tail : y.head; }
 };
-
-class Fixed:public Extend{
+class Fixed:public Extended{
 public:
     Fixed()=default;
     template<typename X,typename Y,typename W,typename H>
-    Fixed(int dockEdge,X x,Y y,W width,H height):Extend::Extend(dockEdge,x,y){
+    Fixed(int dockEdge,X x,Y y,W width,H height):Extended::Extended(dockEdge, x, y){
         setWidth(width);
         setHeight(height);
     }
     template<typename X,typename Y,typename W,typename H>
-    Fixed(X x,Y y,W width,H height):Extend::Extend(Dock::Left+Dock::Top,x,y){
+    Fixed(X x,Y y,W width,H height):Extended::Extended(Horizontal::Left, Vertical::Top, x, y){
         setWidth(width);
         setHeight(height);
     }
@@ -517,11 +565,11 @@ public:
     }
 };
 //TODO:将上面的类改成Grid<Fixed>形式
-//TODO:添加Grid<Extend>,该类setChild只接受Fixed和Extend类型
+//TODO:添加Grid<Extended>,该类setChild只接受Fixed和Extend类型
 //TODO:添加Grid<Margin>
 //TODO:Stack:Extend布局类 Stack<Fixed> Stack<Margin>
 
-//TODO:考虑用Fixed Extend Margin 套 Grid Panel Stack的方式而非模板特化！
+//TODO:考虑用Fixed Extended Margin 套 Grid Panel Stack的方式而非模板特化！
 
 
 
