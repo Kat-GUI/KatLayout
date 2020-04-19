@@ -47,17 +47,22 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 void test2(){
 
 }
+using namespace std;
 auto a = new Margin(10);
-auto grid = new Grid<Fixed>( {0.25f,0.25f,0.5f},{0.25f,0.25f,0.5f},Dock::Right+Dock::Bottom,10,10,400,400);
+auto container = new Widget();
 int main()
 {
     window=new Margin(10,10,10,10);
 
-
-    grid->setChild(0,1,3,1,a);
-    grid->setChild(0,0,1,1,new Margin(10));
-    grid->setChild(2,0,1,1,new Margin(10));
-    window->child=grid;
+    container->setHeightExtend(true);
+    container->setWidthExtend(true);
+    //auto grid= new Fixed(10,10,100,100);
+    auto grid = new Grid(vector<int>{50,50,50},vector<int>{100,50,60});
+    grid->setChild(0,1,2,2,a);
+    grid->setChild(0,0,new Margin(10));
+    grid->setChild(2,0,new Margin(10));
+    container->child=grid;
+    window->child=container;
 
 
 //    Fixed f(Fixed::Left+Fixed::Top,100,100);

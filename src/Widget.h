@@ -8,6 +8,7 @@
 #include<limits>
 #include<vector>
 #include<math.h>
+#include<iostream>
 //#include"../cpp_DOM/src/DOM.h"
 
 #include<windows.h>
@@ -236,7 +237,7 @@ public:
 
 class Extend:public Widget{
 public:
-
+    Extend()=default;
     template<typename X,typename Y>
     Extend(int dockEdge,X x,Y y){
         if((dockEdge&Dock::Left)==Dock::Left)setLeft(x);
@@ -343,11 +344,10 @@ public:
 
 
 
-template<typename T>
-class Grid:public Fixed{
+class Grid:public Widget{
     std::vector<float> scaleX,scaleY;
     std::vector<int> unitX,unitY;
-    enum adjuestMode{Scale,Unit,Fix}mode;
+    enum adjuestMode{Scale,Unit}modeX,modeY;
     int colm=0,rowm=0;
     struct Container{
         Widget* widget;
@@ -362,65 +362,106 @@ class Grid:public Fixed{
         for(int a:set)l+=a;
         return l;
     }
-public:
-    template<typename X,typename Y,typename W,typename H>
-    Grid(int columns,int rows,int dockEdge,X x,Y y,W width,H height)
-        :colm(columns),rowm(rows),Fixed::Fixed(dockEdge,x,y,width,height){
-        table.resize(rows);
-        for(auto& row:table)row=std::vector<int>(columns,-1);
-        mode=Fix;
-    }
 
-    template<typename X,typename Y>
-    Grid(std::vector<int> rows_length,std::vector<int> columns_length,int dockEdge,X x,Y y)
-        :Fixed::Fixed(dockEdge,x,y,getSum(columns_length),getSum(rows_length)){
+    void setUnits(std::vector<int> input,adjuestMode &mode,Axis &axis,std::vector<int> &units){
         int sum=0;
-        unitX.push_back(0);
-        for(int i=0;i<columns_length.size();i++){
-            sum+=columns_length[i];
-            unitX.push_back(sum);
+        units.push_back(0);
+        for(int i=0;i<input.size();i++){
+            sum+=input[i];
+            units.push_back(sum);
         }
-        sum=0;
-        unitY.push_back(0);
-        for(int i=0;i<rows_length.size();i++){
-            sum+=rows_length[i];
-            unitY.push_back(sum);
-        }
-        table.resize(unitY.size()-1);
-        for(auto& row:table)row=std::vector<int>(unitX.size()-1,-1);
+        axis.body=sum;
         mode=Unit;
     }
-
-    template<typename X,typename Y,typename W,typename H>
-    Grid(std::vector<float> columns_scale,std::vector<float> rows_scale,int dockEdge,X x,Y y,W width,H height)
-        :Fixed::Fixed(dockEdge,x,y,width,height){
-        float sum=0;
-        scaleX.push_back(0);
-        for(int i=0;i<columns_scale.size();i++){
-            sum+=columns_scale[i];
-            scaleX.push_back(sum);
+    void setScales(std::vector<float> input,adjuestMode &mode,Axis &axis,std::vector<float> &scales){
+        float sum = 0;
+        scales.push_back(0);
+        for(int i=0;i<input.size();i++){
+            sum+=input[i];
+            scales.push_back(sum);
         }
-        sum=0;
-        scaleY.push_back(0);
-        for(int i=0;i<rows_scale.size();i++){
-            sum+=rows_scale[i];
-            scaleY.push_back(sum);
-        }
-        table.resize(scaleY.size()-1);
-        for(auto& row:table)row=std::vector<int>(scaleX.size()-1,-1);
+        axis.tail=axis.head=0;
         mode=Scale;
     }
+    void setTable(int w,int h){
+        table.resize(h);
+        for(auto& row:table)row=std::vector<int>(w,-1);
+        colm=w;
+        rowm=h;
+    }
+public:
 
-    template<typename X,typename Y>
-    Grid(std::vector<int> unit_length,int dockEdge,X x,Y y)
-        :Grid(unit_length,unit_length,dockEdge,x,y){}
+//DivideMode UnitMode ScaleMode 与 X Y排列组合
+//爷吐了 Dart那种可选参数的设计简直是人类的希望
+#define CallUnitCol     setUnits(columns_length,modeX,x,unitX)
+#define CallUnitRow     setUnits(rows_length,modeY,y,unitY);
+#define CallScaleCol    setScales(columns_scales,modeX,x,scaleX)
+#define CallScaleRow    setScales(rows_scales,modeY,y,scaleY)
+#define CallDevideCol   setScales(std::vector<float>(1/columns,columns),modeX,x,scaleX)
+#define CallDevideRow   setScales(std::vector<float>(1/rows,rows),modeY,y,scaleY)
+    Grid(int rows,int columns){
+        setTable(columns,rows);
+        CallDevideRow;
+        CallDevideCol;
+    }
+    Grid(int rows,std::vector<int> columns_length){
+        setTable(columns_length.size(),rows);
+        CallDevideRow;
+        CallUnitCol;
+    }
+    Grid(int rows,std::vector<float> columns_scales){
+        setTable(columns_scales.size(),rows);
+        CallScaleCol;
+        CallDevideRow;
 
-    template<typename X,typename Y,typename W,typename H>
-    Grid(std::vector<float> unit_scale,int dockEdge,X x,Y y,W width,H height)
-        :Grid(unit_scale,unit_scale,dockEdge,x,y,width,height){}
+    }
+
+    Grid(std::vector<int> rows_length,int columns){
+        setTable(columns,rows_length.size());
+        CallUnitRow;
+        CallDevideCol;
+    }
+    Grid(std::vector<int> rows_length,std::vector<int> columns_length){
+        for(auto ele:rows_length)std::cout<<ele<<std::endl;
+        setTable(columns_length.size(),rows_length.size());
+        CallUnitRow;
+        CallUnitCol;
+    }
+    Grid(std::vector<int> rows_length,std::vector<float> columns_scales){
+        setTable(columns_scales.size(),rows_length.size());
+        CallUnitRow;
+        CallScaleCol;
+    }
+
+    Grid(std::vector<float> rows_scales,int columns){
+        setTable(columns,rows_scales.size());
+        CallScaleRow;
+        CallDevideCol;
+    }
+    Grid(std::vector<float> rows_scales,std::vector<int> columns_length){
+        setTable(columns_length.size(),rows_scales.size());
+        CallScaleRow;
+        CallUnitCol;
+    }
+    Grid(std::vector<float> rows_scales,std::vector<float> columns_scales){
+        setTable(columns_scales.size(),rows_scales.size());
+        CallScaleRow;
+        CallScaleCol;
+    }
+
+    Grid(std::vector<int> unit_length):Grid(unit_length,unit_length){}
+    Grid(std::vector<float> unit_scale):Grid(unit_scale,unit_scale){}
+    Grid(int unit):Grid(unit,unit){}
+//属实恶心
+#undef CallUnitCol
+#undef CallUnitRow
+#undef CallScaleCol
+#undef CallScaleRow
+#undef CallDevideCol
+#undef CallDevideRow
 
     virtual void render(HDC hdc)override {
-        Fixed::render(hdc);
+        Widget::render(hdc);
         for(auto c:content){
             if(c.widget!=nullptr){
                 c.widget->calcuRegion(this);
@@ -432,18 +473,26 @@ public:
     void setChild(int col,int row,int spanCol,int spanRow,Widget* widget){
 //        if(col>-1 && col < colm && row > -1 && row < rowm &&
 //            spanCol>-1 && spanCol < colm && spanRow > -1 && spanRow < row){
-        Fixed* tmp;
-        switch(mode){
-            case Fix:
-                tmp = new Fixed((float)1.0/colm*col,(float)1.0/rowm*row,(float)1.0/colm*spanCol,(float)1.0/rowm*spanRow);
-                break;
-            case Unit:
-                tmp = new Fixed(unitX[col],unitY[row],unitX[col+spanCol]-unitX[col],unitY[row+spanRow]-unitY[row]);
-                break;
-            case Scale:
-                tmp = new Fixed(scaleX[col],scaleY[row],scaleX[col+spanCol]-scaleX[col],scaleY[row+spanRow]-scaleY[row]);
-                break;
+
+        Fixed* tmp=new Fixed();
+        if(modeX==Unit){
+            tmp->setLeft<int>(unitX[col]);
+            tmp->setWidth<int>(unitX[col+spanCol]-unitX[col]);
         }
+        else {
+            tmp->setLeft<float>(scaleX[col]);
+            tmp->setWidth<float>(scaleX[col+spanCol]-scaleX[col]);
+        }
+
+        if(modeY==Unit){
+            tmp->setTop<int>(unitY[row]);
+            tmp->setHeight<int>(unitY[row+spanRow]-unitY[row]);
+        }
+        else{
+            tmp->setTop<float>(scaleY[row]);
+            tmp->setHeight<float>(scaleY[row+spanRow]-scaleY[row]);
+        }
+
         tmp->child=widget;
         content.push_back(Container(col,row,spanRow,spanCol,tmp));
         int index=content.size()-1;
@@ -460,11 +509,19 @@ public:
 
 //        }
     }
+    void setChild(int col,int row,Widget* widget){
+        setChild(col,row,1,1,widget);
+    }
     ~Grid(){
         for(auto p:content)delete p.widget;
     }
 };
+//TODO:将上面的类改成Grid<Fixed>形式
+//TODO:添加Grid<Extend>,该类setChild只接受Fixed和Extend类型
+//TODO:添加Grid<Margin>
+//TODO:Stack:Extend布局类 Stack<Fixed> Stack<Margin>
 
+//TODO:考虑用Fixed Extend Margin 套 Grid Panel Stack的方式而非模板特化！
 
 
 
