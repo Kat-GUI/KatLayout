@@ -129,6 +129,7 @@ public:
         calcuAxis(y,region.y,region.h,region.b,container->region.y,container->region.h);
 	}
 
+	//TODO: 把这里set get都删掉
 	//下面到undef之前都是烦人的口水代码
 #define ASSERT static_assert(std::is_same<T,int>::value||std::is_same<T,float>::value||std::is_same<T,double>::value,"The template parameter must be int or float.")
 	template<typename T>
@@ -178,21 +179,25 @@ const float Layout::empty = std::numeric_limits<float>::lowest();
 
 class Widget:public Layout {
 public:
+    HBRUSH brush;
+    Widget(){
+        brush = CreateSolidBrush(RGB(std::rand()%200,std::rand()%200,std::rand()%200));
+    }
     virtual void render(HDC hdc) {
         RECT r;
         r.left=region.x;
         r.top=region.y;
         r.right=region.w+region.x;
         r.bottom=region.h+region.y;
-
-        FrameRect(hdc,&r,CreateSolidBrush(RGB(std::rand()%200,std::rand()%200,std::rand()%200)));
+        Rectangle(hdc,r.left,r.top,r.right,r.bottom);
+        FillRect(hdc,&r,brush);
+        //FrameRect(hdc,&r,CreateSolidBrush(RGB(0,0,0)));//RGB(std::rand()%200,std::rand()%200,std::rand()%200)));
         if (child != nullptr) {
             child->calcuRegion(this);
             ((Widget*)child)->render(hdc);
         }
     }
 };
-
 
 enum class Horizontal{Left,Center,Right};
 enum class Vertical{Top,Center,Bottom};
@@ -295,7 +300,8 @@ public:
         setWidthExtend(true);
     }
     Extended(Horizontal horizontalDock, Vertical verticalDock){
-        Extended(horizontalDock, verticalDock, 0, 0);
+        setHeightExtend(true);
+        setWidthExtend(true);
     }
 
     template<typename T>
@@ -308,7 +314,7 @@ public:
             x.head=int_or_float;
             x.scaleHead=std::is_same<T,float>::value;
         }
-        x.extended=false;
+//        x.extended=false;
     }
     template<typename T>
     void setY(T int_or_float){
@@ -320,7 +326,7 @@ public:
             y.head=int_or_float;
             y.scaleHead=std::is_same<T,float>::value;
         }
-        y.extended=false;
+//        y.extended=false;
     }
     //TODO:增加get/set Width Height,处理当使用Width/Height时getX getY返回不正确的结果的问题
     float getX(){ return x.head==Layout::empty ? x.tail : x.head; }
@@ -336,6 +342,11 @@ public:
     }
     template<typename X,typename Y,typename W,typename H>
     Fixed(X x,Y y,W width,H height):Extended::Extended(Horizontal::Left, Vertical::Top, x, y){
+        setWidth(width);
+        setHeight(height);
+    }
+    template<typename W,typename H>
+    Fixed(W width,H height):Extended::Extended(Horizontal::Left, Vertical::Top){
         setWidth(width);
         setHeight(height);
     }
@@ -358,7 +369,6 @@ public:
 };
 
 using displayCondition = std::function<bool(Size)>;
-
 //这个类不能为extended
 class Dynamic:public Fixed{
     bool isDefault=true;
@@ -389,8 +399,6 @@ public:
         if(flag)child=default_widget;
     }
 };
-
-
 
 class Grid:public Widget{
     std::vector<float> scaleX,scaleY;
@@ -564,14 +572,75 @@ public:
         for(auto p:content)delete p.widget;
     }
 };
-//TODO:将上面的类改成Grid<Fixed>形式
-//TODO:添加Grid<Extended>,该类setChild只接受Fixed和Extend类型
-//TODO:添加Grid<Margin>
-//TODO:Stack:Extend布局类 Stack<Fixed> Stack<Margin>
+//enum class AlignMode{Vertical,Horizontal,Unit};
+enum class Direction{Horizontal,Vertical};
+class Stack:public Margin{
+    std::list<Extended*> childs;
+    //AlignMode mMode;
+    Direction mFloating;
+    Horizontal hDock;
+    Vertical vDock;
+    void AddChild(Widget* c){
+        auto tmp = new Extended(hDock,vDock,0,0);
+        tmp->child=c;
+        childs.push_back(tmp);
+    }
+public:
+    Stack(Horizontal horizontalDock,Vertical verticalDock,Direction floating)
+        :hDock(horizontalDock),vDock(verticalDock),mFloating(floating),Margin::Margin(0){}
 
-//TODO:考虑用Fixed Extended Margin 套 Grid Panel Stack的方式而非模板特化！
+    Stack(Direction floating):Stack(Horizontal::Left,Vertical::Top,floating){}
 
+    virtual void calcuRegion(Layout* container)override{
+        Layout::calcuRegion(container);
+        int floating=0,stacking=0,maxStacking=0;
+        if(mFloating==Direction::Horizontal){
+            for(std::list<Extended*>::iterator iter=childs.begin();iter!=childs.end();){
+                (*iter)->setX<int>(floating+region.x);
+                (*iter)->setY<int>(stacking+region.y);
+                (*iter)->calcuRegion(this);
+                if(floating != 0 && floating + (*iter)->region.w > region.w){
+                    stacking+=maxStacking;
+                    floating=maxStacking=0;
+                }
+                else{
+                    maxStacking=std::max(maxStacking,(int)(*iter)->region.h);
+                    floating+=(*iter)->region.w;
+                    iter++;
+                }
+            }
+            region.h=stacking;
+        }
+        else{
+            for(std::list<Extended*>::iterator iter=childs.begin();iter!=childs.end();){
+                (*iter)->setY<int>(floating+region.y);
+                (*iter)->setX<int>(stacking+region.x);
+                (*iter)->calcuRegion(this);
+                if(floating != 0 && floating + (*iter)->region.h > region.h){
+                    stacking+=maxStacking;
+                    floating=maxStacking=0;
+                }
+                else{
+                    maxStacking=std::max(maxStacking,(int)(*iter)->region.w);
+                    floating+=(*iter)->region.h;
+                    iter++;
+                }
+            }
+            region.h=stacking;
+        }
 
+    }
+    //拒绝Margin类型
+    void Add(Extended* child){ AddChild(child); }
+    void Add(Fixed* child){ AddChild(child); }
+
+    virtual void render(HDC hdc)override {
+        Widget::render(hdc);
+        for(auto c:childs){
+            c->render(hdc);
+        }
+    }
+};
 
 class Panel:public Widget{
 public:
@@ -586,250 +655,14 @@ public:
     }
 };
 
+//TODO:将上面的类改成Grid<Fixed>形式
+//TODO:添加Grid<Extended>,该类setChild只接受Fixed和Extend类型
+//TODO:添加Grid<Margin>
+//TODO:Stack:Extend布局类 Stack<Fixed> Stack<Margin>
+
+//TODO:考虑用Fixed Extended Margin 套 Grid Panel Stack的方式而非模板特化！
 
 
-//
-//Widget *Widget::Zero = new Widget();
-//
 
-//
-//class MutiWidget : public Widget
-//{
-//	displayCondition smaller_condition, larger_condition;
-//	Widget *smaller,*larger,*normal;
-//	virtual void resetRegion(Widget *parent) override
-//	{
-//        //选择合适的layout
-//        Size size;
-//        bool flag = false;
-//        size.height = region.h;
-//        size.width = region.w;
-//        size.scale_height = region.h / parent->region.h;
-//        size.scale_width = region.w / parent->region.w;
-//        if (larger_condition)
-//        {
-//            if (larger_condition(size))
-//            {
-//                flag = true;
-//                larger->resetRegion(parent);
-//            }
-//        }
-//        if (smaller_condition)
-//        {
-//            if (smaller_condition(size))
-//            {
-//                flag = true;
-//                smaller->resetRegion(parent);
-//            }
-//        }
-//        if (!flag)normal->resetRegion(parent);;
-//	}
-//
-//public:
-//	MutiWidget(Widget* smaller, displayCondition smaller_condition, Widget* normal,
-//			   Widget* larger, displayCondition larger_condition)
-//	{
-//
-//		this->smaller = smaller;
-//		this->larger = larger;
-//		this->larger_condition = larger_condition;
-//		this->smaller_condition = smaller_condition;
-//	}
-//	MutiWidget(Widget* smaller, displayCondition smaller_condition, Widget* normal)
-//	{
-//		this->normal = normal;
-//		this->smaller = smaller;
-//		this->smaller_condition = smaller_condition;
-//	}
-//	MutiWidget(Widget* normal, Widget* larger, displayCondition larger_condition)
-//	{
-//		this->normal = normal;
-//		this->larger = larger;
-//		this->larger_condition = larger_condition;
-//	}
-//
-//	//void setSmallerChild(Layout* layout, displayCondition condition) {
-//	//	if (smaller_layout != nullptr)delete smaller_layout;
-//	//	this->smaller_layout = layout;
-//	//	//if(layout!=nullptr)layout->parent=this;
-//	//	this->smaller_condition = condition;
-//	//	//添加region到脏矩形
-//	//	//resetRegion
-//	//	//添加region到脏矩形
-//	//	//....
-//	//	//通知刷新
-//	//}
-//
-//	//void setLargerChild(Layout* layout, displayCondition condition) {
-//	//	if (larger_layout != nullptr)delete larger_layout;
-//	//	this->larger_layout = layout;
-//	//	//if (layout != nullptr)layout->parent=this;
-//	//	this->larger_condition = condition;
-//	//	//添加region到脏矩形
-//	//	//resetRegion
-//	//	//添加region到脏矩形
-//	//	//....
-//	//	//通知刷新
-//	//}
-//};
-//
-//class ScrollField:public Widget
-//{
-//public:
-//    ScrollField(){}
-//
-//};
-//
-//class Canvas : public Widget
-//{
-//
-//};
-//
-//class Stack : public Widget
-//{
-//
-//};
-//
-//class Grid:public Widget
-//{
-//    int colm,rowm;
-//    struct Container
-//    {
-//        Widget* widget;
-//        Container(int row,int col,int spanRow,int spanCol,Widget* widget):
-//        row(row),col(col),spanRow(spanRow),spanCol(spanCol){
-//            this->widget->child=widget;
-//            widget->left=new int(0);
-//            widget->top=new int(0);
-//            widget->width=new int(0);
-//            widget->height=new int(0);
-//        }
-//        int row,col,spanRow,spanCol;
-//    };
-//    std::vector<Container*> content;
-//    std::vector<std::vector<int>> table;
-//    Container* get(int col,int row) {
-//        return content[table[col][row]];
-//    }
-//public:
-//    virtual void render(HDC hdc)override
-//    {
-//        Rectangle(hdc,region.x,region.y,region.x+region.w,region.y+region.h);
-//        for(auto c:content)
-//        {
-//            if(c!=nullptr)
-//            {
-//                c->widget->resetRegion(this);
-//                c->widget->render(hdc);
-//            }
-//        }
-//    }
-//    void resetRegion(Widget* parent)override
-//    {
-//        Widget::resetRegion(parent);
-//        int unitW= region.w / colm;
-//        int unitH= region.h / rowm;
-//        for(auto c:content)
-//        {
-//            Layout* d=c->widget;
-//            *d->left=c->col*unitW;
-//            *d->top=c->row*unitH;
-//            *d->width=c->spanCol*unitW;
-//            *d->height=c->spanRow*unitH;
-//        }
-//    }
-//
-//    Grid(int columns,int rows,DOM::initializer property)
-//    {
-//        colm=columns;
-//        rowm=rows;
-//        DOM::moveProperty(property,this);
-//
-//        table.resize(rows);
-//        for (int i = 0; i < rows; i++)
-//            table[i].resize(columns);
-//    }
-//
-//    void setChild(int col,int row,int spanCol,int spanRow,Widget* widget)
-//    {
-//        if(col>-1 && col < colm && row > -1 && row < rowm &&
-//            spanCol>-1 && spanCol < colm && spanRow > -1 && spanRow < row)
-//        {
-//            content.push_back(new Container(col,row,spanRow,spanCol,widget));
-//            int index=content.size();
-//            for(int y=col;y<col+spanCol;y++)
-//                for(int x=row;x<row+spanRow;x++)
-//                {
-//                    delete get(x,y)->widget;
-//                    delete get(x,y);
-//                    content[table[x][y]]=nullptr;
-//                    table[y][x]=index;
-//                }
-//
-//        }
-//    }
-//
-//    void setChild(int col,int row,Widget* widget)
-//    {
-//        setChild(col,row,1,1,widget);
-//    }
-//
-//};
-
-//namespace DOM
-//{
-//	auto child(Widget *layout) { return item(&Layout::child, layout); }
-//	auto extendedWidth(){return item(&Layout::pending_width,true);}
-//	auto extendedHeight(){return item(&Layout::pending_height,true);}
-//
-//	auto left(int px) { return item(&Layout::left, new int(px)); }
-//	auto top(int px) { return item(&Layout::top, new int(px)); }
-//	auto right(int px) { return item(&Layout::right, new int(px)); }
-//	auto bottom(int px) { return item(&Layout::bottom, new int(px)); }
-//	auto width(int px) { return item(&Layout::width, new int(px)); }
-//	auto height(int px) { return item(&Layout::height, new int(px)); }
-//	auto maxWidth(int px){ return item(&Layout::max_width,new int(px));}
-//	auto minWidth(int px){ return item(&Layout::min_width,new int(px));}
-//	auto maxHeight(int px){ return item(&Layout::max_height,new int(px));}
-//	auto minHeight(int px){ return item(&Layout::min_height,new int(px));}
-//
-//	auto margin(int left,int top,int right,int bottom){
-//	    return new ComplexItem<Layout>([=](Layout* it){
-//	        it->left=new int(left);
-//	        it->top=new int(top);
-//	        it->right=new int(right);
-//	        it->bottom=new int(bottom);
-//	    });
-//	}
-//	auto margin(int px){
-//	    return margin(px,px,px,px);
-//	}
-//
-//	auto left(float scale) { return item(&Layout::scale_left, new float(scale)); }
-//	auto top(float scale) { return item(&Layout::scale_top, new float(scale)); }
-//	auto right(float scale) { return item(&Layout::scale_right, new float(scale)); }
-//	auto bottom(float scale) { return item(&Layout::scale_bottom, new float(scale)); }
-//	auto width(float scale) { return item(&Layout::scale_width, new float(scale)); }
-//	auto height(float scale) { return item(&Layout::scale_height, new float(scale)); }
-//	auto maxWidth(float scale){ return item(&Layout::scale_max_width,new float(scale));}
-//	auto minWidth(float scale){ return item(&Layout::scale_min_width,new float(scale));}
-//	auto maxHeight(float scale){ return item(&Layout::scale_max_height,new float(scale));}
-//	auto minHeight(float scale){ return item(&Layout::scale_min_height,new float(scale));}
-//
-//	auto child(int col,int row,int spanCol,int spanRow,Widget* widget)
-//    {
-//	    return new ComplexItem<Grid>([=](Grid* it){
-//	       it->setChild(col,row,spanCol,spanRow,widget);
-//	    });
-//    }
-//
-//    auto child(int col,int row,Widget* widget)
-//    {
-//        return new ComplexItem<Grid>([=](Grid* it){
-//            it->setChild(col,row,widget);
-//        });
-//    }
-//
-//}
 #undef ASSERT
 #endif

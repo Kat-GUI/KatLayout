@@ -53,15 +53,65 @@ auto a = new Margin(10);
 int main()
 {
     window=new Margin(10,10,10,10);
+    auto f = new Fixed()
+//    auto e = new Extended(Horizontal::Left,Vertical::Top,10,10);
+//    e->child=new Fixed(300,300);
+//    e->id="heeeeeeeeeeeeere!";
+//    window->child=e;
+//    auto stack = new Stack(Horizontal::Right,Vertical::Bottom,Direction::Vertical);
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(300,200));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(200,300));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//    stack->Add(new Fixed(100,100));
+//
+//    window->child=stack;
 
-    auto container = new Extended(Vertical::Top, 10, 500);
-    //auto grid= new Fixed(10,10,100,100);
-    auto grid = new Grid(vector<int>{50,50,50},vector<float>{0.2,0.3,0.5});
-    grid->setChild(0,1,2,2,a);
-    grid->setChild(0,0,new Margin(10));
-    grid->setChild(2,0,new Margin(10));
-    container->child=grid;
-    window->child=container;
+//    auto container = new Extended(Vertical::Top, 10, 500);
+//    //auto grid= new Fixed(10,10,100,100);
+//    auto grid = new Grid(vector<int>{50,50,50},vector<float>{0.2,0.3,0.5});
+//    grid->setChild(0,1,2,2,a);
+//    grid->setChild(0,0,new Margin(10));
+//    grid->setChild(2,0,new Margin(10));
+//    container->child=grid;
+//    window->child=container;
 
 
 //    Fixed f(Fixed::Left+Fixed::Top,100,100);
