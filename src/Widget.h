@@ -19,8 +19,10 @@ struct Size
 };
 
 class Widget;
+class Limited;
 class Layout
 {
+    friend Limited;
 public:
     Layout(){
         x.type=Axis::X;
@@ -157,7 +159,17 @@ public:
         y.tail=int_or_float;
     }
     template<typename T>
-
+    void setHeight(T int_or_float){
+        ASSERT;
+        y.scaleBody=std::is_same<T,float>::value;
+        y.body=int_or_float;
+    }
+    template<typename T>
+    void setWidth(T int_or_float){
+        ASSERT;
+        x.scaleBody=std::is_same<T,float>::value;
+        x.body=int_or_float;
+    }
     float getTop(){ return y.head; }
     float getRight(){ return x.tail; }
     float getBottom(){ return y.tail; }
@@ -173,6 +185,14 @@ public:
     void setHeightExtend(bool val){ y.extended=val; y.body=0;}
     bool getWidthExtend(){ return x.extended; }
     bool getHeightExtend(){ return y.extended; }
+    float getMinHeight(){ return y.limit.min; }
+    float getMaxHeight(){ return y.limit.max; }
+    float getMinWidth(){ return x.limit.min; }
+    float getMaxWidth(){ return x.limit.max; }
+    void setMinHeight(float val){ y.limit.min=val; }
+    void setMaxHeight(float val){ y.limit.max=val; }
+    void setMinWidth(float val){ x.limit.min=val; }
+    void setMaxWidth(float val){ x.limit.max=val; }
 
 };
 const float Layout::empty = std::numeric_limits<float>::lowest();
@@ -198,6 +218,8 @@ public:
         }
     }
 };
+
+
 
 enum class Horizontal{Left,Center,Right};
 enum class Vertical{Top,Center,Bottom};
@@ -243,6 +265,7 @@ public:
 };
 class Extended: public Widget{
 public:
+    //TODO:把这里X Y统统去掉
     Extended()=default;
     template<typename X,typename T,typename B>
     Extended(Horizontal horizontalDock, X x, T top, B bottom){
@@ -336,7 +359,8 @@ class Fixed:public Extended{
 public:
     Fixed()=default;
     template<typename X,typename Y,typename W,typename H>
-    Fixed(int dockEdge,X x,Y y,W width,H height):Extended::Extended(dockEdge, x, y){
+    Fixed(Horizontal horizontalDock,Vertical verticalDock,X x,Y y,W width,H height):
+        Extended::Extended(horizontalDock,verticalDock, x, y){
         setWidth(width);
         setHeight(height);
     }
@@ -367,6 +391,17 @@ public:
     float getWidth(){ return x.body; }
     float getHeight(){ return y.body; }
 };
+
+
+
+template<typename T>
+T* limit(float maxHeight,float minHeight,float maxWidth,float minWidth,T* object){
+    object->setMinWidth(minWidth);
+    object->setMaxWidth(maxWidth);
+    object->setMinHeight(minHeight);
+    object->setMaxHeight(maxHeight);
+}
+
 
 using displayCondition = std::function<bool(Size)>;
 //这个类不能为extended
@@ -469,7 +504,6 @@ public:
         setTable(columns_scales.size(),rows);
         CallScaleCol;
         CallDevideRow;
-
     }
 
     Grid(std::vector<int> rows_length,int columns){
@@ -574,7 +608,7 @@ public:
 };
 //enum class AlignMode{Vertical,Horizontal,Unit};
 enum class Direction{Horizontal,Vertical};
-class Stack:public Margin{
+class Stack:public Widget{
     std::list<Extended*> childs;
     //AlignMode mMode;
     Direction mFloating;
@@ -587,7 +621,20 @@ class Stack:public Margin{
     }
 public:
     Stack(Horizontal horizontalDock,Vertical verticalDock,Direction floating)
-        :hDock(horizontalDock),vDock(verticalDock),mFloating(floating),Margin::Margin(0){}
+        :hDock(horizontalDock),vDock(verticalDock),mFloating(floating){
+        if(horizontalDock==Horizontal::Left) setLeft(0); else setRight(0);
+        if(verticalDock==Vertical::Top) setTop(0); else setBottom(0);
+            //setLeft(0);setTop(0);setBottom(0);setRight(0);
+        if(floating==Direction::Horizontal){
+            setHeight(0);
+            if(horizontalDock==Horizontal::Left) setRight(0); else setLeft(0);
+        }
+        else{
+            setWidth(0);
+            if(verticalDock==Vertical::Top) setBottom(0); else setTop(0);
+        }
+
+    }
 
     Stack(Direction floating):Stack(Horizontal::Left,Vertical::Top,floating){}
 
@@ -596,8 +643,8 @@ public:
         int floating=0,stacking=0,maxStacking=0;
         if(mFloating==Direction::Horizontal){
             for(std::list<Extended*>::iterator iter=childs.begin();iter!=childs.end();){
-                (*iter)->setX<int>(floating+region.x);
-                (*iter)->setY<int>(stacking+region.y);
+                (*iter)->setX<int>(floating);
+                (*iter)->setY<int>(stacking);
                 (*iter)->calcuRegion(this);
                 if(floating != 0 && floating + (*iter)->region.w > region.w){
                     stacking+=maxStacking;
@@ -609,12 +656,12 @@ public:
                     iter++;
                 }
             }
-            region.h=stacking;
+            setHeight(stacking+maxStacking);
         }
         else{
             for(std::list<Extended*>::iterator iter=childs.begin();iter!=childs.end();){
-                (*iter)->setY<int>(floating+region.y);
-                (*iter)->setX<int>(stacking+region.x);
+                (*iter)->setY<int>(floating);
+                (*iter)->setX<int>(stacking);
                 (*iter)->calcuRegion(this);
                 if(floating != 0 && floating + (*iter)->region.h > region.h){
                     stacking+=maxStacking;
@@ -626,13 +673,14 @@ public:
                     iter++;
                 }
             }
-            region.h=stacking;
+            setWidth(stacking+maxStacking);
         }
 
     }
     //拒绝Margin类型
     void Add(Extended* child){ AddChild(child); }
     void Add(Fixed* child){ AddChild(child); }
+    void Add(Grid* child){ AddChild(child); }
 
     virtual void render(HDC hdc)override {
         Widget::render(hdc);
@@ -640,6 +688,10 @@ public:
             c->render(hdc);
         }
     }
+};
+
+class Flow:public Widget{
+
 };
 
 class Panel:public Widget{

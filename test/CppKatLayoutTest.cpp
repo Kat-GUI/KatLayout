@@ -52,57 +52,19 @@ auto a = new Margin(10);
 
 int main()
 {
-    window=new Margin(10,10,10,10);
-    auto f = new Fixed()
+    window=new Margin(100,100,100,10);
+
 //    auto e = new Extended(Horizontal::Left,Vertical::Top,10,10);
 //    e->child=new Fixed(300,300);
 //    e->id="heeeeeeeeeeeeere!";
 //    window->child=e;
-//    auto stack = new Stack(Horizontal::Right,Vertical::Bottom,Direction::Vertical);
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(300,200));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(200,300));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//    stack->Add(new Fixed(100,100));
-//
-//    window->child=stack;
+    auto stack = limit(300,300,400,300,new Stack(Horizontal::Left,Vertical::Top,Direction::Horizontal));
+
+    auto g1 = new Grid(vector<int>{100,100,100});
+    g1->setChild(1,1,new Fixed(100,100));
+    stack->Add(g1);
+    stack->Add(new Fixed(100,100));
+    window->child=stack;
 
 //    auto container = new Extended(Vertical::Top, 10, 500);
 //    //auto grid= new Fixed(10,10,100,100);
