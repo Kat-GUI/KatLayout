@@ -1,14 +1,15 @@
 #ifndef KAT_LAYOUT
 #define KAT_LAYOUT
-#include <functional>
-#include <list>
-#include <typeindex>
-#include <memory>
-#include <string>
+#include<functional>
+#include<list>
+#include<typeindex>
+#include<memory>
+#include<string>
 #include<limits>
 #include<vector>
 #include<math.h>
 #include<iostream>
+#include<map>
 //#include"../cpp_DOM/src/DOM.h"
 
 #include<windows.h>
@@ -18,9 +19,33 @@ struct Size
 	float scale_height, scale_width;
 };
 
+class Node{
+    std::string id;
+    Node* parent=nullptr;
+    std::list<Node*> child;
+    static std::map<std::string,Node*> map;
+public:
+    void add(Node* node){
+        child.push_back(node);
+        node->parent=this;
+        map.insert(std::make_pair(node->id,node));
+    }
+    void remove(Node* node){
+        child.remove(node);
+        node->parent=nullptr;
+        map.erase(map.find(node->id));
+    }
+    const std::_List_iterator<Node*> begin(){return child.begin();}
+    const std::_List_iterator<Node*> end(){return child.end();}
+    static Node* find(std::string id){
+        return map.find(id)->second;
+    }
+    virtual Node& cast()=0;
+};
+
 class Widget;
 class Limited;
-class Layout
+class Layout:public Node
 {
     friend Limited;
 public:
@@ -28,8 +53,6 @@ public:
         x.type=Axis::X;
         y.type=Axis::Y;
     }
-    std::string id;
-    Layout* child=nullptr;
     struct Region{
         const float obsolete=std::numeric_limits<int>::lowest();
         float x,y,w,h,r,b;
@@ -53,28 +76,28 @@ protected:
 	    }limit;
 	}x,y;
 
-private:
+protected:
     float limit(const Axis &axis,const float& distance){
         float ans=distance;
         if(axis.limit.max!=empty && distance > axis.limit.max)ans=axis.limit.max;
         if(axis.limit.min!=empty && distance < axis.limit.min)ans=axis.limit.min;
         return ans;
     }
-protected:
+public:
+    //蛤？父类长宽由我定？
     virtual float getExetndedParentFiller(Axis::Enum type){
         float ans = 0;
         const Axis &axis = type==Axis::X ? x : y;
-        //蛤？父类长宽由我定？
-        if((axis.extended||axis.scaleBody||axis.scaleHead||axis.scaleTail)){
+        if(axis.extended){
             //我也不知道啊
-            if(child!=nullptr)  //去我子类那问吧
-                ans = child->getExetndedParentFiller(type);
-            else                //草（日语） 我没子类了
-                throw "无法计算坐标";
+            if(begin()!=end()) ans = dynamic_cast<Layout*>((*begin()))->getExetndedParentFiller(type);  //去我子类那问吧
+            else throw "无法计算坐标";                                        //没子类了
         }
         else{
             //我知道
-            ans = limit(axis,axis.body);
+            if(axis.limit.max!=empty) ans=axis.limit.max;
+            else if(axis.scaleBody||axis.scaleHead||axis.scaleTail)ans=0;
+            else ans = limit(axis,axis.body);
         }
         return ans + (axis.head==empty ? 0:axis.head) + (axis.tail==empty ? 0:axis.tail);//加上缝隙
     }
@@ -125,6 +148,7 @@ protected:
         //TODO:安排整体缩放
     }
 public:
+    virtual Layout& cast(){ return *this; }
     virtual void calcuRegion(Layout* container){
         child->region.setObsolete();
         calcuAxis(x,region.x,region.w,region.r,container->region.x,container->region.w);
@@ -608,80 +632,44 @@ public:
 };
 //enum class AlignMode{Vertical,Horizontal,Unit};
 enum class Direction{Horizontal,Vertical};
-class Stack:public Widget{
-    std::list<Extended*> childs;
+class Stack:public Extended{
+    //TODO:弄一个“挤出”事件
+    std::list<Widget*> childs;
     //AlignMode mMode;
     Direction mFloating;
     Horizontal hDock;
     Vertical vDock;
-    void AddChild(Widget* c){
-        auto tmp = new Extended(hDock,vDock,0,0);
-        tmp->child=c;
-        childs.push_back(tmp);
+
+    //首先此处必定只有一条轴为extended
+    virtual float getExetndedParentFiller(Axis::Enum type)override{
+        float ans = 0;
+        const Axis &axis = type==Axis::X ? x : y;
+        if((axis.extended||axis.scaleBody||axis.scaleHead||axis.scaleTail)){
+            ans = child->getExetndedParentFiller(type);
+        }
+        else{
+            ans = limit(axis,axis.body);
+        }
+        return ans + (axis.head==empty ? 0:axis.head) + (axis.tail==empty ? 0:axis.tail);//加上缝隙
     }
 public:
     Stack(Horizontal horizontalDock,Vertical verticalDock,Direction floating)
         :hDock(horizontalDock),vDock(verticalDock),mFloating(floating){
-        if(horizontalDock==Horizontal::Left) setLeft(0); else setRight(0);
-        if(verticalDock==Vertical::Top) setTop(0); else setBottom(0);
-            //setLeft(0);setTop(0);setBottom(0);setRight(0);
-        if(floating==Direction::Horizontal){
-            setHeight(0);
-            if(horizontalDock==Horizontal::Left) setRight(0); else setLeft(0);
-        }
-        else{
-            setWidth(0);
-            if(verticalDock==Vertical::Top) setBottom(0); else setTop(0);
-        }
-
+//        if(floating==Direction::Horizontal)
+//            Extended(horizontalDock,0,0,0);
+//        else
+//            Extended(verticalDock,0,0,0);
     }
 
     Stack(Direction floating):Stack(Horizontal::Left,Vertical::Top,floating){}
 
     virtual void calcuRegion(Layout* container)override{
-        Layout::calcuRegion(container);
-        int floating=0,stacking=0,maxStacking=0;
-        if(mFloating==Direction::Horizontal){
-            for(std::list<Extended*>::iterator iter=childs.begin();iter!=childs.end();){
-                (*iter)->setX<int>(floating);
-                (*iter)->setY<int>(stacking);
-                (*iter)->calcuRegion(this);
-                if(floating != 0 && floating + (*iter)->region.w > region.w){
-                    stacking+=maxStacking;
-                    floating=maxStacking=0;
-                }
-                else{
-                    maxStacking=std::max(maxStacking,(int)(*iter)->region.h);
-                    floating+=(*iter)->region.w;
-                    iter++;
-                }
-            }
-            setHeight(stacking+maxStacking);
-        }
-        else{
-            for(std::list<Extended*>::iterator iter=childs.begin();iter!=childs.end();){
-                (*iter)->setY<int>(floating);
-                (*iter)->setX<int>(stacking);
-                (*iter)->calcuRegion(this);
-                if(floating != 0 && floating + (*iter)->region.h > region.h){
-                    stacking+=maxStacking;
-                    floating=maxStacking=0;
-                }
-                else{
-                    maxStacking=std::max(maxStacking,(int)(*iter)->region.w);
-                    floating+=(*iter)->region.h;
-                    iter++;
-                }
-            }
-            setWidth(stacking+maxStacking);
-        }
 
     }
     //拒绝Margin类型
-    void Add(Extended* child){ AddChild(child); }
-    void Add(Fixed* child){ AddChild(child); }
-    void Add(Grid* child){ AddChild(child); }
-
+    void Add(Widget* child){
+        childs.push_back(child);
+    }
     virtual void render(HDC hdc)override {
         Widget::render(hdc);
         for(auto c:childs){
