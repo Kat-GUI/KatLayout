@@ -20,11 +20,14 @@ struct Size
 };
 
 class Node{
-    std::string id;
     Node* parent=nullptr;
     std::list<Node*> child;
     static std::map<std::string,Node*> map;
 public:
+    std::string id;
+    enum Enum{shrink,expand};
+protected:
+    int childCount(){return child.size();}
     void add(Node* node){
         child.push_back(node);
         node->parent=this;
@@ -35,12 +38,28 @@ public:
         node->parent=nullptr;
         map.erase(map.find(node->id));
     }
-    const std::_List_iterator<Node*> begin(){return child.begin();}
-    const std::_List_iterator<Node*> end(){return child.end();}
+    template<typename T>
+    void foreach(std::function<void(T&)> func){
+        for(auto iter=child.begin();iter!=child.end();iter++)
+            func(*dynamic_cast<T*>(*iter));
+    }
+    template<typename R=Node>
+    R* getParent(){return dynamic_cast<R*>(parent);}
+    template<typename R=Node>
+    R* getfirstChild(){return dynamic_cast<R*>(*child.begin());}
+    void setfirstChild(Node* node,bool autoDelete=true){
+        if(autoDelete)delete *child.begin(); else (*child.begin())->parent=nullptr;
+        (*child.begin())=node;
+    }
     static Node* find(std::string id){
         return map.find(id)->second;
     }
-    virtual Node& cast()=0;
+    virtual void processMessage(Enum msg){
+        //onMessage(msg);
+        for(auto node:child)
+            node->processMessage(msg);
+    };
+//    virtual void onMessage(Enum msg)=0;
 };
 
 class Widget;
@@ -84,19 +103,24 @@ protected:
         return ans;
     }
 public:
+    virtual bool shrinkable(Axis::Enum axis){ return true; }
+    virtual bool expandable(Axis::Enum axis){ return true; }
+    virtual void shrink(Axis::Enum axis,int px){ if(childCount()>0) getfirstChild<Layout>()->shrink(axis,px); }
+    virtual void expand(Axis::Enum axis,int px){ if(childCount()>0) getfirstChild<Layout>()->expand(axis,px); }
     //蛤？父类长宽由我定？
-    virtual float getExetndedParentFiller(Axis::Enum type){
+    //返回最小值
+    virtual float getFillerLength(Axis::Enum type){
         float ans = 0;
         const Axis &axis = type==Axis::X ? x : y;
         if(axis.extended){
             //我也不知道啊
-            if(begin()!=end()) ans = dynamic_cast<Layout*>((*begin()))->getExetndedParentFiller(type);  //去我子类那问吧
+            if(childCount()>0) ans = getfirstChild<Layout>()->getFillerLength(type);  //去我子类那问吧
             else throw "无法计算坐标";                                        //没子类了
         }
         else{
             //我知道
-            if(axis.limit.max!=empty) ans=axis.limit.max;
-            else if(axis.scaleBody||axis.scaleHead||axis.scaleTail)ans=0;
+            if(axis.limit.max!=empty) ans = axis.limit.min;
+            else if(axis.scaleBody||axis.scaleHead||axis.scaleTail) ans = 0;
             else ans = limit(axis,axis.body);
         }
         return ans + (axis.head==empty ? 0:axis.head) + (axis.tail==empty ? 0:axis.tail);//加上缝隙
@@ -109,21 +133,21 @@ protected:
         if(axis.head==empty && axis.body!=empty && axis.tail==empty){
             //[   ],body,[   ]
             tmp = axis.scaleBody ? axis.body*parent_distance : axis.body;
-            distance = limit(axis,axis.extended ? child->getExetndedParentFiller(axis.type): tmp);
+            distance = limit(axis, axis.extended ? getfirstChild<Layout>()->getFillerLength(axis.type) : tmp);
             begin = (parent_distance - distance)/2;
             end = begin;
         }
         else if(axis.head==empty && axis.body!=empty && axis.tail!=empty){
             //[   ],body,tail
             tmp = axis.scaleBody ? axis.body*parent_distance : axis.body;
-            distance = limit(axis,axis.extended ? child->getExetndedParentFiller(axis.type): tmp);
+            distance = limit(axis, axis.extended ? getfirstChild<Layout>()->getFillerLength(axis.type) : tmp);
             end = axis.scaleTail ? axis.tail*parent_distance : axis.tail;
             begin = parent_distance - distance - end;
         }
         else if(axis.head != empty && axis.body!=empty && axis.tail==empty){
             //head,body,[   ]
             tmp = axis.scaleBody ? axis.body*parent_distance : axis.body;
-            distance = limit(axis,axis.extended ? child->getExetndedParentFiller(axis.type): tmp);
+            distance = limit(axis, axis.extended ? getfirstChild<Layout>()->getFillerLength(axis.type) : tmp);
             begin = axis.scaleHead ? axis.head*parent_distance : axis.head;
             end = parent_distance - distance - begin;
         }
@@ -132,7 +156,7 @@ protected:
             begin = axis.scaleHead ? axis.head*parent_distance : axis.head;
             end = axis.scaleTail ? axis.tail*parent_distance : axis.tail;
             tmp = parent_distance - begin - end;
-            distance = limit(axis,axis.extended ? child->getExetndedParentFiller(axis.type): tmp);
+            distance = limit(axis, axis.extended ? getfirstChild<Layout>()->getFillerLength(axis.type) : tmp);
             if(tmp!=distance) {
                 begin += (tmp - distance)/2;
                 end += (tmp - distance)/2;
@@ -141,16 +165,15 @@ protected:
             //避免非parent::extended时执行此代码，否则会有意外的结果
             begin=axis.head;
             end = axis.tail;
-            distance=limit(axis,axis.extended ? child->getExetndedParentFiller(axis.type): axis.body);
+            distance=limit(axis, axis.extended ? getfirstChild<Layout>()->getFillerLength(axis.type) : axis.body);
         }
         begin+=parent_begin;
         end+=parent_begin;
         //TODO:安排整体缩放
     }
 public:
-    virtual Layout& cast(){ return *this; }
     virtual void calcuRegion(Layout* container){
-        child->region.setObsolete();
+        //getfirstChild<Layout>()->region.setObsolete();
         calcuAxis(x,region.x,region.w,region.r,container->region.x,container->region.w);
         calcuAxis(y,region.y,region.h,region.b,container->region.y,container->region.h);
 	}
@@ -236,9 +259,10 @@ public:
         Rectangle(hdc,r.left,r.top,r.right,r.bottom);
         FillRect(hdc,&r,brush);
         //FrameRect(hdc,&r,CreateSolidBrush(RGB(0,0,0)));//RGB(std::rand()%200,std::rand()%200,std::rand()%200)));
-        if (child != nullptr) {
-            child->calcuRegion(this);
-            ((Widget*)child)->render(hdc);
+        if (childCount()>0) {
+            auto tmp = getfirstChild<Widget>();
+            tmp->calcuRegion(this);
+            tmp->render(hdc);
         }
     }
 };
@@ -288,6 +312,7 @@ public:
     float getBottom(){ return y.tail; }
 };
 class Extended: public Widget{
+    enum ExtendedMode{horizontal,vertical}extendedMode;
 public:
     //TODO:把这里X Y统统去掉
     Extended()=default;
@@ -378,6 +403,22 @@ public:
     //TODO:增加get/set Width Height,处理当使用Width/Height时getX getY返回不正确的结果的问题
     float getX(){ return x.head==Layout::empty ? x.tail : x.head; }
     float getY(){ return y.head==Layout::empty ? y.tail : y.head; }
+
+    virtual bool shrinkable(Axis::Enum axis)override{
+        if((extendedMode==horizontal && axis==Axis::Y)||(extendedMode==vertical && axis==Axis::X))return true;
+        foreach<Layout>([&](Layout& child){
+            if(child.shrinkable(axis))return true;
+        });
+        return false;
+    }
+    virtual bool expandable(Axis::Enum axis)override{
+        if((extendedMode==horizontal && axis==Axis::Y)||(extendedMode==vertical && axis==Axis::X))return true;
+        foreach<Layout>([&](Layout& child){
+            if(child.shrinkable(axis))return true;
+        });
+        return false;
+    }
+
 };
 class Fixed:public Extended{
 public:
@@ -414,9 +455,14 @@ public:
     }
     float getWidth(){ return x.body; }
     float getHeight(){ return y.body; }
+    void setChild(Widget* widget){setfirstChild(widget);}
+
+    virtual bool shrinkable()override{ return false; }
+    virtual bool expandable()override{ return false; }
+    virtual void shrink(int px)override{  }
+    virtual void expand(int px)override{  }
+    //TODO:getChild function
 };
-
-
 
 template<typename T>
 T* limit(float maxHeight,float minHeight,float maxWidth,float minWidth,T* object){
@@ -432,9 +478,14 @@ using displayCondition = std::function<bool(Size)>;
 class Dynamic:public Fixed{
     bool isDefault=true;
 public:
-    std::list<std::pair<Widget*,displayCondition>> candidate;
-    const displayCondition empty;
-    const displayCondition caseElse= [&](Size){ isDefault=true;return true;};
+    std::list<Widget*> candidate;
+    void shrink(int px){
+
+    }
+    void expand(int px){
+
+    }
+
     virtual void calcuRegion(Layout* container)override{
         Layout::calcuRegion(container);
         Size size;
@@ -451,11 +502,11 @@ public:
                     default_widget=p.first;
                     continue;
                 }
-                child=p.first;
+                setfirstChild(p.first);
                 flag=false;
             }
         }
-        if(flag)child=default_widget;
+        if(flag)setfirstChild(default_widget);
     }
 };
 
@@ -607,7 +658,7 @@ public:
             tmp->setHeight<float>(scaleY[row+spanRow]-scaleY[row]);
         }
 
-        tmp->child=widget;
+        tmp->setChild(widget);
         content.push_back(Container(col,row,spanRow,spanCol,tmp));
         int index=content.size()-1;
         for(int y=row;y<row+spanRow;y++){
@@ -634,46 +685,47 @@ public:
 enum class Direction{Horizontal,Vertical};
 class Stack:public Extended{
     //TODO:弄一个“挤出”事件
-    std::list<Widget*> childs;
     //AlignMode mMode;
     Direction mFloating;
     Horizontal hDock;
     Vertical vDock;
-
+    float prv_stacking=0;
     //首先此处必定只有一条轴为extended
-    virtual float getExetndedParentFiller(Axis::Enum type)override{
-        float ans = 0;
+    virtual float getFillerLength(Axis::Enum type)override{
         const Axis &axis = type==Axis::X ? x : y;
-        if((axis.extended||axis.scaleBody||axis.scaleHead||axis.scaleTail)){
-            ans = child->getExetndedParentFiller(type);
-        }
-        else{
-            ans = limit(axis,axis.body);
-        }
-        return ans + (axis.head==empty ? 0:axis.head) + (axis.tail==empty ? 0:axis.tail);//加上缝隙
+        if(mFloating==Direction::Horizontal && type==Axis::Y)
+            return prv_stacking + (vDock==Vertical::Top ? y.head : y.tail);
+        else if(mFloating==Direction::Vertical && type==Axis::X)
+            return prv_stacking + (hDock==Horizontal::Left ? x.head : x.tail);
+        else
+            return limit(axis,axis.body) + (axis.head==empty ? 0:axis.head) + (axis.tail==empty ? 0:axis.tail);
     }
+    Stack(int,Horizontal horizontalDock):Extended::Extended(horizontalDock,0,0,0){}
+    Stack(int,Vertical verticalDock):Extended::Extended(verticalDock,0,0,0){}
 public:
     Stack(Horizontal horizontalDock,Vertical verticalDock,Direction floating)
         :hDock(horizontalDock),vDock(verticalDock),mFloating(floating){
-//        if(floating==Direction::Horizontal)
-//            Extended(horizontalDock,0,0,0);
-//        else
-//            Extended(verticalDock,0,0,0);
+        if(floating==Direction::Horizontal) Stack(0,verticalDock); else Stack(0,horizontalDock);
     }
 
     Stack(Direction floating):Stack(Horizontal::Left,Vertical::Top,floating){}
 
     virtual void calcuRegion(Layout* container)override{
+        if(mFloating==Direction::Horizontal){
 
+        }
+        else{
+
+        }
     }
-    //拒绝Margin类型
+
     void Add(Widget* child){
-        childs.push_back(child);
+        add(child);
     }
     virtual void render(HDC hdc)override {
         Widget::render(hdc);
-        for(auto c:childs){
-            c->render(hdc);
+        for(auto iter=begin();iter!=end();iter++){
+            dynamic_cast<Widget*>(*iter)->render(hdc);
         }
     }
 };
