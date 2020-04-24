@@ -8,8 +8,10 @@
 #include<limits>
 #include<vector>
 #include<math.h>
+#include<queue>
 #include<iostream>
 #include<map>
+#include<algorithm>
 //#include"../cpp_DOM/src/DOM.h"
 
 #include<windows.h>
@@ -26,8 +28,11 @@ class Node{
 public:
     std::string id;
     enum Enum{shrink,expand};
-protected:
-    int childCount(){return child.size();}
+public:
+    int childCount(){
+        if(child.empty())return 0;
+        return child.size();
+    }
     void add(Node* node){
         child.push_back(node);
         node->parent=this;
@@ -41,15 +46,28 @@ protected:
     template<typename T>
     void foreach(std::function<void(T&)> func){
         for(auto iter=child.begin();iter!=child.end();iter++)
-            func(*dynamic_cast<T*>(*iter));
+            if(*iter!=nullptr) func(*dynamic_cast<T*>(*iter));
     }
+    std::list<Node*>::iterator begin(){return child.begin();}
+    std::list<Node*>::iterator end(){return child.end();}
     template<typename R=Node>
     R* getParent(){return dynamic_cast<R*>(parent);}
     template<typename R=Node>
-    R* getfirstChild(){return dynamic_cast<R*>(*child.begin());}
+    R* getfirstChild(){
+        if(child.empty())return nullptr;
+        return dynamic_cast<R*>(*child.begin());
+    }
     void setfirstChild(Node* node,bool autoDelete=true){
-        if(autoDelete)delete *child.begin(); else (*child.begin())->parent=nullptr;
-        (*child.begin())=node;
+        if(child.empty())
+            child.push_back(node);
+        else{
+            (*child.begin())=node;
+            if(autoDelete)
+                delete *child.begin();
+            else
+                (*child.begin())->parent=nullptr;
+        }
+        if(node!=nullptr)node->parent=this;
     }
     static Node* find(std::string id){
         return map.find(id)->second;
@@ -61,6 +79,7 @@ protected:
     };
 //    virtual void onMessage(Enum msg)=0;
 };
+std::map<std::string,Node*> Node::map;
 
 class Widget;
 class Limited;
@@ -103,10 +122,7 @@ protected:
         return ans;
     }
 public:
-    virtual bool shrinkable(Axis::Enum axis){ return true; }
     virtual bool expandable(Axis::Enum axis){ return true; }
-    virtual void shrink(Axis::Enum axis,int px){ if(childCount()>0) getfirstChild<Layout>()->shrink(axis,px); }
-    virtual void expand(Axis::Enum axis,int px){ if(childCount()>0) getfirstChild<Layout>()->expand(axis,px); }
     //蛤？父类长宽由我定？
     //返回最小值
     virtual float getFillerLength(Axis::Enum type){
@@ -119,8 +135,8 @@ public:
         }
         else{
             //我知道
-            if(axis.limit.max!=empty) ans = axis.limit.min;
-            else if(axis.scaleBody||axis.scaleHead||axis.scaleTail) ans = 0;
+            if(axis.limit.min!=empty) ans = axis.limit.min;
+            else if(axis.scaleBody||axis.scaleHead||axis.scaleTail||axis.body==empty) ans = 0;
             else ans = limit(axis,axis.body);
         }
         return ans + (axis.head==empty ? 0:axis.head) + (axis.tail==empty ? 0:axis.tail);//加上缝隙
@@ -265,6 +281,7 @@ public:
             tmp->render(hdc);
         }
     }
+    void setChild(Widget* child){setfirstChild(child);}
 };
 
 
@@ -310,6 +327,10 @@ public:
     }
     float getRight(){ return x.tail; }
     float getBottom(){ return y.tail; }
+
+    virtual bool expandable(Axis::Enum axis)override{
+        return true;
+    }
 };
 class Extended: public Widget{
     enum ExtendedMode{horizontal,vertical}extendedMode;
@@ -319,8 +340,8 @@ public:
     template<typename X,typename T,typename B>
     Extended(Horizontal horizontalDock, X x, T top, B bottom){
         switch(horizontalDock){
-            case Horizontal::Left:  setLeft(x);break;
-            case Horizontal::Right: setRight(x);break;
+            case Horizontal::Left:  setLeft<X>(x);break;
+            case Horizontal::Right: setRight<X>(x);break;
         }
         setTop(top);
         setBottom(bottom);
@@ -340,8 +361,8 @@ public:
     template<typename Y,typename L,typename R>
     Extended(Vertical verticalDock, Y y, L left, R right){
         switch(verticalDock){
-            case Vertical::Top:    setTop(x);break;
-            case Vertical::Bottom: setBottom(x);break;
+            case Vertical::Top:    setTop(y);break;
+            case Vertical::Bottom: setBottom(y);break;
         }
         setLeft(left);
         setRight(right);
@@ -404,19 +425,10 @@ public:
     float getX(){ return x.head==Layout::empty ? x.tail : x.head; }
     float getY(){ return y.head==Layout::empty ? y.tail : y.head; }
 
-    virtual bool shrinkable(Axis::Enum axis)override{
-        if((extendedMode==horizontal && axis==Axis::Y)||(extendedMode==vertical && axis==Axis::X))return true;
-        foreach<Layout>([&](Layout& child){
-            if(child.shrinkable(axis))return true;
-        });
-        return false;
-    }
+
     virtual bool expandable(Axis::Enum axis)override{
-        if((extendedMode==horizontal && axis==Axis::Y)||(extendedMode==vertical && axis==Axis::X))return true;
-        foreach<Layout>([&](Layout& child){
-            if(child.shrinkable(axis))return true;
-        });
-        return false;
+//TODO expandable Extended
+        return true;
     }
 
 };
@@ -455,12 +467,11 @@ public:
     }
     float getWidth(){ return x.body; }
     float getHeight(){ return y.body; }
-    void setChild(Widget* widget){setfirstChild(widget);}
+    void setChild(Widget* widget){
+        setfirstChild(widget);
+    }
 
-    virtual bool shrinkable()override{ return false; }
-    virtual bool expandable()override{ return false; }
-    virtual void shrink(int px)override{  }
-    virtual void expand(int px)override{  }
+    virtual bool expandable(Axis::Enum axis)override{ return false; }
     //TODO:getChild function
 };
 
@@ -475,38 +486,53 @@ T* limit(float maxHeight,float minHeight,float maxWidth,float minWidth,T* object
 
 using displayCondition = std::function<bool(Size)>;
 //这个类不能为extended
-class Dynamic:public Fixed{
+class Dynamic:public Margin{
     bool isDefault=true;
+    struct Candidate{
+        float minW,minH;
+        Widget* widget;
+    }current;
+    std::list<Candidate> candidate;
+    float xMax=std::numeric_limits<float>::min();
+    float xMin=std::numeric_limits<float>::max();
+    float yMax=std::numeric_limits<float>::min();
+    float yMin=std::numeric_limits<float>::max();
 public:
-    std::list<Widget*> candidate;
-    void shrink(int px){
-
+    Dynamic():Margin::Margin(0){}
+    void addChild(Widget* child){
+        Candidate tmp;
+        tmp.widget=child;
+        tmp.minH=child->getFillerLength(Axis::Y);
+        tmp.minW=child->getFillerLength(Axis::X);
+        xMax=std::max(xMax,tmp.minW);
+        xMin=std::min(xMin,tmp.minW);
+        x.limit.max=xMax;
+        x.limit.min=xMin;
+        yMax=std::max(yMax,tmp.minH);
+        yMin=std::min(yMin,tmp.minH);
+        y.limit.max=yMax;
+        y.limit.min=yMin;
+        candidate.push_back(tmp);
     }
-    void expand(int px){
 
+    virtual bool expandable(Axis::Enum axis)override{
+        return true;
     }
 
     virtual void calcuRegion(Layout* container)override{
         Layout::calcuRegion(container);
-        Size size;
-        size.width=region.w;
-        size.height=region.h;
-        size.scale_height=region.h/container->region.h;
-        size.scale_width=region.w/container->region.w;
-        isDefault=false;
-        bool flag=true;
-        Widget* default_widget=nullptr;
-        for(auto p:candidate){
-            if(p.second(size)){
-                if(isDefault){
-                    default_widget=p.first;
-                    continue;
-                }
-                setfirstChild(p.first);
-                flag=false;
+        std::map<float,Candidate> l;
+        for(auto c:candidate){
+            l.insert(std::make_pair(region.w-c.minW+region.h-c.minH,c));
+        }
+        Widget* tmp = nullptr;
+        for(auto c:l){
+            if(c.first>0 && c.second.minW < region.w && c.second.minH < region.h){
+                tmp=c.second.widget;
+                break;
             }
         }
-        if(flag)setfirstChild(default_widget);
+        setfirstChild(tmp,false);
     }
 };
 
@@ -700,19 +726,84 @@ class Stack:public Extended{
         else
             return limit(axis,axis.body) + (axis.head==empty ? 0:axis.head) + (axis.tail==empty ? 0:axis.tail);
     }
-    Stack(int,Horizontal horizontalDock):Extended::Extended(horizontalDock,0,0,0){}
-    Stack(int,Vertical verticalDock):Extended::Extended(verticalDock,0,0,0){}
 public:
     Stack(Horizontal horizontalDock,Vertical verticalDock,Direction floating)
         :hDock(horizontalDock),vDock(verticalDock),mFloating(floating){
-        if(floating==Direction::Horizontal) Stack(0,verticalDock); else Stack(0,horizontalDock);
+        if(floating==Direction::Horizontal){
+            setLeft(0);
+            setRight(0);
+        }
+        else{
+            setTop(0);
+            setBottom(0);
+        }
+        if(horizontalDock==Horizontal::Left)x.head=0; else if(horizontalDock==Horizontal::Right) x.tail=0;
+        if(verticalDock==Vertical::Top)y.head=0; else if(verticalDock==Vertical::Bottom) y.tail=0;
     }
 
     Stack(Direction floating):Stack(Horizontal::Left,Vertical::Top,floating){}
 
     virtual void calcuRegion(Layout* container)override{
+        if(childCount()==0)return;
+        bool newline=true;
+        Layout::calcuRegion(container);
         if(mFloating==Direction::Horizontal){
-
+            float floating=0,stacking=0,expandCount=0,maxStacking=0;
+            std::queue<Fixed*> queue;
+            std::queue<float> floatQueue;
+            std::queue<float> stackQueue;
+            for(auto iter=begin();iter!=end()||queue.size()>0;){
+                float w,h;
+                Fixed* ptr=nullptr;
+                Widget* child=nullptr;
+                if(iter!=end()){
+                    ptr=dynamic_cast<Fixed*>(*iter);
+                    if(ptr==nullptr){iter++;continue;}
+                    child = ptr->getfirstChild<Widget>();
+                    w = child->getFillerLength(Axis::X);
+                    if(w==Layout::empty)w=0;
+                    h = child->getFillerLength(Axis::Y);
+                    if(h==Layout::empty) h=0;
+                    maxStacking = std::max(maxStacking,h);
+                }
+                if((floating + w > region.w || iter==end()) && newline==false){
+                    float expandPx = (region.w-(int)floating)/expandCount;
+                    expandCount=0;
+                    floating=0;
+                    while(queue.size()>0){
+                        Fixed* front = queue.front();
+                        queue.pop();
+                        front->setLeft<int>(floating);
+                        front->setTop<int>(stacking);
+                        w = floatQueue.front();
+                        h = stackQueue.front();
+                        stackQueue.pop();
+                        floatQueue.pop();
+                        child = front->getfirstChild<Widget>();
+                        if(child->expandable(Axis::X)) w+=expandPx;
+                        if(child->getMinWidth()!=Layout::empty)
+                            w = std::min(child->getMaxWidth(),w);
+                        front->setWidth<int>(w);
+                        front->setHeight<int>(maxStacking);
+                        front->calcuRegion(this);
+                        floating+=w;
+                    }
+                    floating=0;
+                    stacking+=maxStacking;
+                    maxStacking=0;
+                    newline=true;
+                }
+                else{
+                    if(child->expandable(Axis::X))expandCount++;
+                    floatQueue.push(w);
+                    stackQueue.push(h);
+                    queue.push(ptr);
+                    floating+=w;
+                    iter++;
+                    newline=false;
+                }
+            }
+            region.h=stacking;
         }
         else{
 
@@ -720,13 +811,21 @@ public:
     }
 
     void Add(Widget* child){
-        add(child);
+        auto ptr = new Fixed(0,0);
+        ptr->setChild(child);
+        add(ptr);
     }
     virtual void render(HDC hdc)override {
         Widget::render(hdc);
-        for(auto iter=begin();iter!=end();iter++){
-            dynamic_cast<Widget*>(*iter)->render(hdc);
-        }
+        foreach<Widget>([&](Widget& child){
+            child.calcuRegion(this);
+            child.render(hdc);
+        });
+    }
+    virtual bool expandable(Axis::Enum type)override{
+        if(mFloating==Direction::Horizontal && type==Axis::X)return true;
+        else if(mFloating==Direction::Vertical && type==Axis::Y)return true;
+        else return false;
     }
 };
 

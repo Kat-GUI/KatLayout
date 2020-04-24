@@ -52,9 +52,45 @@ using namespace std;
 int main()
 {
     window=new Margin(100,100,100,10);
-    auto e = new Extended(Horizontal::Left,Vertical::Top);
-    e->child = new Margin(10);//limit(500,300,500,200,new Margin(10));
-    window->child=e;
+    auto s = new Stack(Direction::Horizontal);
+    auto s2 = new Stack(Direction::Horizontal);
+    s2->Add(new Fixed(0,0,60,50));
+    s2->Add(new Fixed(0,0,60,50));
+    s2->Add(new Fixed(0,0,60,50));
+    s2->Add(new Fixed(0,0,60,50));
+    s2->Add(new Fixed(0,0,60,50));
+
+    s->Add(s2);
+    s->Add(new Fixed(0,0,150,60));
+    s->Add(limit(50,50,100,80,new Margin(0)));
+    s->Add(limit(50,50,120,80,new Margin(0)));
+
+
+//    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));
+//    s->Add(limit(90,90,400,100,new Margin(0)));
+
+
+
+    window->setChild(s);
+
 
 //    auto e = new Extended(Horizontal::Left,Vertical::Top,10,10);
 //    e->child=new Fixed(300,300);
@@ -190,7 +226,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             parent.region.y=0;
             parent.region.w=rect->right;
             parent.region.h=rect->bottom;
-            parent.child=window;
+            parent.setChild(window);
             window->calcuRegion(&parent);
             window->render(hdc);
             EndPaint(hwnd, &ps);
