@@ -27,7 +27,6 @@ class Node{
     static std::map<std::string,Node*> map;
 public:
     std::string id;
-    enum Enum{shrink,expand};
 public:
     int childCount(){
         if(child.empty())return 0;
@@ -65,7 +64,7 @@ public:
             if(autoDelete)
                 delete *child.begin();
             else
-                (*child.begin())->parent=nullptr;
+                if(node!=nullptr)(*child.begin())->parent=nullptr;
         }
         if(node!=nullptr)node->parent=this;
     }
@@ -277,8 +276,10 @@ public:
         //FrameRect(hdc,&r,CreateSolidBrush(RGB(0,0,0)));//RGB(std::rand()%200,std::rand()%200,std::rand()%200)));
         if (childCount()>0) {
             auto tmp = getfirstChild<Widget>();
-            tmp->calcuRegion(this);
-            tmp->render(hdc);
+            if(tmp!=nullptr){
+                tmp->calcuRegion(this);
+                tmp->render(hdc);
+            }
         }
     }
     void setChild(Widget* child){setfirstChild(child);}
@@ -506,11 +507,11 @@ public:
         tmp.minW=child->getFillerLength(Axis::X);
         xMax=std::max(xMax,tmp.minW);
         xMin=std::min(xMin,tmp.minW);
-        x.limit.max=xMax;
+        x.limit.max=xMax+1;
         x.limit.min=xMin;
         yMax=std::max(yMax,tmp.minH);
         yMin=std::min(yMin,tmp.minH);
-        y.limit.max=yMax;
+        y.limit.max=yMax+1;
         y.limit.min=yMin;
         candidate.push_back(tmp);
     }
@@ -716,6 +717,7 @@ class Stack:public Extended{
     Horizontal hDock;
     Vertical vDock;
     float prv_stacking=0;
+    float max_w=0;
     //首先此处必定只有一条轴为extended
     virtual float getFillerLength(Axis::Enum type)override{
         const Axis &axis = type==Axis::X ? x : y;
@@ -724,7 +726,7 @@ class Stack:public Extended{
         else if(mFloating==Direction::Vertical && type==Axis::X)
             return prv_stacking + (hDock==Horizontal::Left ? x.head : x.tail);
         else
-            return limit(axis,axis.body) + (axis.head==empty ? 0:axis.head) + (axis.tail==empty ? 0:axis.tail);
+            return limit(axis,max_w) + (axis.head==empty ? 0:axis.head) + (axis.tail==empty ? 0:axis.tail);
     }
 public:
     Stack(Horizontal horizontalDock,Vertical verticalDock,Direction floating)
@@ -761,6 +763,7 @@ public:
                     if(ptr==nullptr){iter++;continue;}
                     child = ptr->getfirstChild<Widget>();
                     w = child->getFillerLength(Axis::X);
+                    max_w = std::max(max_w,w);
                     if(w==Layout::empty)w=0;
                     h = child->getFillerLength(Axis::Y);
                     if(h==Layout::empty) h=0;
@@ -804,6 +807,7 @@ public:
                 }
             }
             region.h=stacking;
+            prv_stacking=stacking;
         }
         else{
 

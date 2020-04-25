@@ -51,19 +51,26 @@ using namespace std;
 
 int main()
 {
-    window=new Margin(100,100,100,10);
+    window=new Margin(10,10,10,10);
     auto s = new Stack(Direction::Horizontal);
-    auto s2 = new Stack(Direction::Horizontal);
-    s2->Add(new Fixed(0,0,60,50));
-    s2->Add(new Fixed(0,0,60,50));
-    s2->Add(new Fixed(0,0,60,50));
-    s2->Add(new Fixed(0,0,60,50));
-    s2->Add(new Fixed(0,0,60,50));
+//    auto s2 = new Stack(Direction::Horizontal);
+//    s2->Add(new Fixed(0,0,60,50));
+//    s2->Add(new Fixed(0,0,60,50));
+//    s2->Add(new Fixed(0,0,60,50));
+//    s2->Add(new Fixed(0,0,60,50));
+//    s2->Add(new Fixed(0,0,60,50));
 
-    s->Add(s2);
-    s->Add(new Fixed(0,0,150,60));
-    s->Add(limit(50,50,100,80,new Margin(0)));
-    s->Add(limit(50,50,120,80,new Margin(0)));
+    //s->Add(s2);
+//    s->Add(new Fixed(0,0,150,60));
+//    s->Add(limit(50,50,100,80,new Margin(0)));
+//    s->Add(limit(50,50,120,80,new Margin(0)));
+    auto dy = new Dynamic();
+    dy->addChild(new Fixed(200,200));
+    dy->addChild(new Fixed(100,100));
+    s->Add(dy);
+    s->Add(limit(300,200,300,200,new Margin(10)));
+    s->Add(limit(300,200,300,200,new Margin(10)));
+    s->Add(limit(300,200,300,200,new Margin(10)));
 
 
 //    s->Add(limit(90,90,400,100,new Margin(0)));
