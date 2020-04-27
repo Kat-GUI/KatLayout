@@ -217,11 +217,11 @@ public:
     virtual int getBoxHeight()override{return (bool)child ? child->getBoxHeight():minH;}
 };
 
+//TODO 增加"挤压出子组件到另一个组件中"的功能
 class Column:public Layout{
     std::vector<std::shared_ptr<Layout>> childs;
     int h=0;
 public:
-    Column(){}
     Column(int height):h(height){}
     Column& addChild(Layout* layout){
         std::shared_ptr<Layout> tmp;
@@ -232,7 +232,7 @@ public:
     virtual void calcuRegion(Region anchor)override{
         Layout::inColumn=true;
         std::vector<float> extWidth;
-        float extSum=0,restSpace=anchor.w,fix=0,floating=0;
+        float extSum=0,restSpace=anchor.w,floating=0;
         for(auto c:childs){
             restSpace-=c->getBoxMinWidth();
             extWidth.push_back(c->getBoxMaxWidth()-c->getBoxMinWidth());
@@ -327,6 +327,123 @@ public:
     virtual bool extendableInHeight()override{return false;}
     virtual int getBoxWidth()override{return getBoxMaxWidth();};
     virtual int getBoxHeight()override{return region.h;}
+};
+
+//TODO 增加"挤压出子组件到另一个组件中"的功能
+//TODO 测试以下两个类
+class Rows:public Layout{
+    std::vector<std::shared_ptr<Layout>> childs;
+    int w=0;
+public:
+    Rows(int width):w(width){}
+    Rows& addChild(Layout* layout){
+        std::shared_ptr<Layout> tmp;
+        tmp.reset(layout);
+        childs.push_back(tmp);
+        return *this;
+    }
+    virtual void calcuRegion(Region anchor)override{
+        Layout::inRow=true;
+        std::vector<float> extHeight;
+        float extSum=0,restSpace=anchor.w,floating=0;
+        for(auto c:childs){
+            restSpace-=c->getBoxMinHeight();
+            extHeight.push_back(c->getBoxMaxHeight()-c->getBoxMinHeight());
+            extSum+=extHeight.back();
+        }
+        region.l=anchor.l;
+        region.t=anchor.t;
+        region.w=w;
+        region.r=region.l+region.w;
+        for(int i=0;i<childs.size();i++){
+            int ext = restSpace * extHeight[i]/extSum;
+            if(ext<0)ext=0;
+            region.h=std::min(childs[i]->getBoxMinHeight()+ext,childs[i]->getBoxMaxHeight());
+            region.b=region.t+region.h;
+            childs[i]->calcuRegion(region);
+            int realH = childs[i]->getBoxHeight();
+            region.t+=realH;
+            floating+=realH;
+            if(region.h>realH) {
+                extSum -= extHeight[i];
+                restSpace -= (realH - childs[i]->getBoxMinHeight());
+            }
+        }
+        region.t=anchor.t;
+        region.h=floating;
+        region.b=region.t+region.h;
+        Layout::inRow=false;
+        draw(region);
+    }
+    virtual int getBoxMinHeight()override{
+        int ans=0;
+        for(auto c:childs) ans+=c->getBoxMinHeight();
+        return ans;
+    }
+    virtual int getBoxMaxHeight()override{
+        int ans=0;
+        for(auto c:childs) ans+=c->getBoxMaxHeight();
+        return ans;
+    }
+    virtual int getBoxMinWidth()override{return w;}
+    virtual int getBoxMaxWidth()override{return w;}
+    virtual bool extendableInWidth()override{return false;}
+    virtual bool extendableInHeight()override{return true;}
+    virtual int getBoxHeight()override{
+        int ans=0;
+        for(auto c:childs) ans+=c->getBoxHeight();
+        return ans;
+    };
+    virtual int getBoxWidth()override{return region.w;}
+};
+
+class ExtendRow:public Layout{
+    std::vector<std::shared_ptr<Layout>> childs;
+    int w=0;
+public:
+    ExtendRow(int width):w(width){}
+    ExtendRow& addChild(Layout* layout){
+        std::shared_ptr<Layout> tmp;
+        tmp.reset(layout);
+        childs.push_back(tmp);
+        return *this;
+    }
+    virtual void calcuRegion(Region anchor)override{
+        Layout::inColumn=true;
+        int floating=0;
+        region.l=anchor.l;
+        region.t=anchor.t;
+        region.w=w;
+        region.r=region.l+w;
+        for(auto c:childs){
+            region.h=c->getBoxMaxHeight();
+            floating+=region.h;
+            region.b=region.t+region.h;
+            c->calcuRegion(region);
+            region.t+=region.h;
+        }
+        region.l=anchor.l;
+        region.h=floating;
+        region.b=region.t+region.h;
+        draw(region);
+        Layout::inRow=false;
+    }
+    virtual int getBoxMinWidth()override{return w;}
+    virtual int getBoxMaxWidth()override{return w;}
+    virtual int getBoxMinHeight()override{ return getBoxMaxHeight(); }
+    virtual int getBoxMaxHeight()override{
+        int ans=0;
+        for(auto c:childs)ans+=c->getBoxMaxHeight();
+        return ans;
+    }
+    virtual bool extendableInWidth()override{return false;}
+    virtual bool extendableInHeight()override{return false;}
+    virtual int getBoxWidth()override{return w;};
+    virtual int getBoxHeight()override{return getBoxMaxHeight();}
+};
+
+class WarpPanel:public Layout{
+
 };
 
 //TODO 增加ExtendGrid
