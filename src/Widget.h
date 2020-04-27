@@ -14,19 +14,33 @@
 #include<algorithm>
 #include<memory>
 //#include"../cpp_DOM/src/DOM.h"
-
 #include<windows.h>
+HDC testHdc;
 class Layout{
 protected:
     std::shared_ptr<Layout> child;
 public:
-    struct Region{int l,t,w,h,r,b;}region;
+    struct Region{int l,t,w,h,r,b;};
     virtual void calcuRegion(Region anchor)=0;
     virtual int getBoxMinWidth()=0;
     virtual int getBoxMaxWidth()=0;
     virtual int getBoxMinHeight()=0;
     virtual int getBoxMaxHeight()=0;
+    virtual bool extendableInWidth()=0;
+    virtual bool extendableInHeight()=0;
+    virtual int getBoxWidth()=0;
+    virtual int getBoxHeight()=0;
+    HBRUSH brush;
+    Layout(){
+        brush = CreateSolidBrush(RGB(std::rand()%200,std::rand()%200,std::rand()%200));
+    }
+    static bool inColumn;
+    static bool inRow;
+protected:
+    Region region;
 };
+bool Layout::inColumn=false;
+bool Layout::inRow=false;
 class Limit{
 public:
     static const int Min=0;
@@ -41,6 +55,7 @@ public:
         return val;
     }
 };
+const Limit Limit::none;
 class Margin:public Layout{
     int l,t,r,b;
     Limit w,h;
@@ -57,20 +72,26 @@ public:
         region.b=anchor.b-b;
         region.w=region.r-region.l;
         region.h=region.b-region.t;
-        int adjustW = (w.get(region.w) - region.w)/2;
-        int adjustH = (h.get(region.h) - region.h)/2;
+        int adjustW = (region.w - w.get(region.w))/2;
+        int adjustH = (region.h - h.get(region.h))/2;
         region.l+=adjustW;
         region.r-=adjustW;
         region.t+=adjustH;
         region.b-=adjustH;
         region.w=region.r-region.l;
         region.h=region.b-region.t;
+        Rectangle(testHdc,region.l,region.t,region.r,region.b);
         if(child)child->calcuRegion(region);
     }
+
     virtual int getBoxMinWidth()override{return l + w.min + r;}
     virtual int getBoxMaxWidth()override{return l + w.max + r;}
     virtual int getBoxMinHeight()override{return r + h.min + b;}
     virtual int getBoxMaxHeight()override{return t + h.max + b;}
+    virtual bool extendableInWidth()override{return true;}
+    virtual bool extendableInHeight()override{return true;}
+    virtual int getBoxWidth()override{return l+region.w+r;};
+    virtual int getBoxHeight()override{return t+region.h+b;}
 };
 
 enum class Horizontal{left,center,right};
@@ -84,7 +105,7 @@ public:
     Fixed(Horizontal xDock,Vertical yDock,int left,int top,int width,int height,int right,int bottom)
         :xd(xDock),yd(yDock),l(left),t(top),w(width),h(height),r(right),b(bottom){}
     Fixed(int width,int height)
-        :Fixed(Horizontal::left,Vertical::top,0,0,width,height,0,0){}
+        :Fixed(Horizontal::center,Vertical::center,0,0,width,height,0,0){}
     void setChild(Layout* layout){child.reset(layout);}
     virtual void calcuRegion(Region anchor)override{
         region.h=h;
@@ -105,7 +126,7 @@ public:
         switch(yd){
             case Vertical::top:
                 region.t=anchor.t+t;
-                region.b=region.t+w;
+                region.b=region.t+h;
                 break;
             case Vertical::bottom:
                 region.b=anchor.b-b;
@@ -116,11 +137,16 @@ public:
                 region.b=anchor.b - (anchor.h-h)/2;
         }
         if(child)child->calcuRegion(region);
+        Rectangle(testHdc,region.l,region.t,region.r,region.b);
     }
     virtual int getBoxMinWidth()override{return l + w + r;}
     virtual int getBoxMaxWidth()override{return l + w + r;}
     virtual int getBoxMinHeight()override{return t + h + b;}
     virtual int getBoxMaxHeight()override{return t + h + b;}
+    virtual bool extendableInWidth()override{return false;}
+    virtual bool extendableInHeight()override{return false;}
+    virtual int getBoxWidth()override{return l+w+r;};
+    virtual int getBoxHeight()override{return t+h+b;}
 };
 
 class Dynamic:public Layout {
@@ -140,22 +166,123 @@ public:
     virtual void calcuRegion(Region anchor) override {
         region=anchor;
         std::map<int,std::shared_ptr<Layout>> rank;
-        for(auto c:childs)
-            rank.insert(std::make_pair(anchor.w-c->getBoxMinWidth() + anchor.h-c->getBoxMinHeight(),c));
-        for(auto r:rank){
-            if(r.first>-1 && r.second->getBoxMinWidth()<=anchor.w && r.second->getBoxMinHeight()<=anchor.h){
-                child=r.second;
+
+        if(Layout::inColumn)
+            for (auto c:childs)
+                rank.insert(std::make_pair(anchor.w - c->getBoxMinWidth(), c));
+        else if(Layout::inRow)
+            for (auto c:childs)
+                rank.insert(std::make_pair(anchor.h - c->getBoxMinHeight(), c));
+        else
+            for (auto c:childs)
+                rank.insert(std::make_pair(anchor.w - c->getBoxMinWidth()+anchor.h-c->getBoxMinHeight(), c));
+
+        for (auto r:rank) {
+            if (r.first > -1 && r.second->getBoxMinWidth() <= anchor.w && r.second->getBoxMinHeight() <= anchor.h) {
+                child = r.second;
                 break;
             }
         }
+        if(Layout::inColumn && !child->extendableInWidth()) {
+            region.w = child->getBoxWidth();
+            region.r = region.l + region.w;
+        }
+        if(Layout::inRow && !child->extendableInHeight()) {
+            region.h = child->getBoxHeight();
+            region.b = region.t + region.h;
+        }
+
+        Rectangle(testHdc,region.l,region.t,region.r,region.b);
         if(child)child->calcuRegion(region);
+
     }
     virtual int getBoxMinWidth()override{return minW;}
     virtual int getBoxMaxWidth()override{return maxW;}
     virtual int getBoxMinHeight()override{return minH;}
     virtual int getBoxMaxHeight()override{return maxH;}
+    virtual bool extendableInWidth()override{return true;}
+    virtual bool extendableInHeight()override{return true;}
+    virtual int getBoxWidth()override{return (bool)child ? child->getBoxWidth():minW;};
+    virtual int getBoxHeight()override{return (bool)child ? child->getBoxHeight():minH;}
 };
 
+class Column:public Layout{
+    std::vector<std::shared_ptr<Layout>> childs;
+    int h=0;
+public:
+    Column(){}
+    Column(int height):h(height){}
+    Column& addChild(Layout* layout){
+        std::shared_ptr<Layout> tmp;
+        tmp.reset(layout);
+        childs.push_back(tmp);
+        return *this;
+    }
+    virtual void calcuRegion(Region anchor)override{
+        Layout::inColumn=true;
+        std::vector<float> extWidth;
+        float extSum=0,restSpace=anchor.w,fix=0,extCount=0;
+        for(auto c:childs){
+            restSpace-=c->getBoxMinWidth();
+            extWidth.push_back(c->getBoxMaxWidth()-c->getBoxMinWidth());
+            extSum+=extWidth.back();
+            if(c->extendableInWidth())extCount++;
+        }
+        region.l=anchor.l;
+        region.t=anchor.t;
+        region.h=h;
+        region.b=region.t+region.h;
+        for(int i=0;i<childs.size();i++){
+            int ext = restSpace*(extWidth[i])/extSum;
+            if(ext<0)ext=0;
+            region.w=std::min(childs[i]->getBoxMinWidth()+ext,childs[i]->getBoxMaxWidth());
+            region.r=region.l+region.w;
+            childs[i]->calcuRegion(region);
+            region.l+=childs[i]->getBoxWidth();
+        }
+
+//        std::vector<int> extWidth;
+//        int extSum=0;
+//        int extCount=0,restSpace=anchor.w;
+//        for(auto c:childs)
+//        {
+//            restSpace-=c->getBoxMinWidth();
+//            extWidth.push_back(c->getBoxMinWidth()-c->getBoxMaxWidth());
+//            extSum+=extWidth.back();
+//            if(c->extendableInWidth())extCount++;
+//        }
+//        region.l=anchor.l;
+//        region.t=anchor.t;
+//        region.h=h;
+//        region.b=region.l+h;
+//        int unitSpace;
+//        for(int i=0;i<childs.size();i++){
+//            if(childs[i]->extendableInWidth())unitSpace = (--extCount)!=0 ? restSpace*(float)extWidth[i]/(float)extSum:0;
+//            if(unitSpace<0)unitSpace=0;
+//            if(childs[i]->extendableInWidth())
+//                region.w=std::min(childs[i]->getBoxMinWidth() + unitSpace,childs[i]->getBoxMaxWidth());
+//            else
+//                region.w=childs[i]->getBoxMinWidth();
+//            region.r=region.l + region.w;
+//            childs[i]->calcuRegion(region);
+//            restSpace-=(childs[i]->getBoxWidth()-childs[i]->getBoxMinWidth());
+//            region.l+=childs[i]->getBoxWidth();
+//        }
+//        region.w=region.l-anchor.l;
+//        region.l=anchor.l;
+//        region.r=region.l+region.w;
+//        //Rectangle(testHdc,region.l,region.t,region.r,5);
+        Layout::inColumn=false;
+    }
+    virtual int getBoxMinWidth()override{return region.w;}
+    virtual int getBoxMaxWidth()override{return region.w;}
+    virtual int getBoxMinHeight()override{return h;}
+    virtual int getBoxMaxHeight()override{return h;}
+    virtual bool extendableInWidth()override{return true;}
+    virtual bool extendableInHeight()override{return false;}
+    virtual int getBoxWidth()override{return region.w;};
+    virtual int getBoxHeight()override{return region.h;}
+};
 
 //class Layout{
 //protected:

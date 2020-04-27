@@ -5,45 +5,9 @@
 #include"../src/Widget.h"
 #include<iostream>
 //using namespace DOM;
-Widget* window;
+Margin* window;
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-//void test1(){
-//    Dynamic container;
-//    Widget exten,exten2,filler;
-//    container.x.head=5;
-//    container.x.tail=5;
-//    container.y.head=5;
-//    container.y.tail=5;
-//    window.child=&container;
-//
-//    exten.id="exten";
-//    exten.x.body=0;
-//    exten.y.body=0;
-//    exten.x.extended=true;
-//    exten.y.extended=true;
-//    container.candidate.push_back(std::make_pair(&exten,[](Size size){return size.width<400;}));
-//    container.candidate.push_back(std::make_pair(nullptr,[](Size size){return size.width>400&&size.width<600;}));
-//    container.candidate.push_back(std::make_pair(&exten,container.caseElse));
-//    exten2.id="exten2";
-//    exten2.x.head=10;
-//    exten2.x.tail=10;
-//    exten2.y.head=10;
-//    exten2.y.tail=10;
-//    exten2.x.body=0;
-//    exten2.y.body=0;
-//    exten2.x.extended=true;
-//    exten2.y.extended=true;
-//    exten.child=&exten2;
-//
-//    filler.id="filler";
-//    filler.x.body=300;
-//    filler.y.body=300;
-//    filler.x.head=30;
-//    filler.y.head=30;
-//    filler.x.tail=50;
-//    filler.y.tail=50;
-//    exten2.child=&filler;
-//}
+
 void test2(){
 
 }
@@ -51,122 +15,30 @@ using namespace std;
 
 int main()
 {
-    window=new Margin(10,10,10,10);
-    auto s = new Stack(Direction::Horizontal);
-//    auto s2 = new Stack(Direction::Horizontal);
-//    s2->Add(new Fixed(0,0,60,50));
-//    s2->Add(new Fixed(0,0,60,50));
-//    s2->Add(new Fixed(0,0,60,50));
-//    s2->Add(new Fixed(0,0,60,50));
-//    s2->Add(new Fixed(0,0,60,50));
+    window=new Margin(10);
+    auto m = new Margin(10);
+    window->setChild(m);
+    auto c = new Column(100);
+    auto d = new Dynamic();
+    d->addChild(new Margin(10,Limit(90,350)));
+    d->addChild(new Fixed(80,80));
+    d->addChild(new Fixed(30,80));
+    auto d2 = new Dynamic();
+    d2->addChild(new Margin(10,Limit(90,350)));
+    d2->addChild(new Fixed(80,80));
+    d2->addChild(new Fixed(30,80));
+    m->setChild(c);
+    c->addChild(d);
+    c->addChild(d2);
+    c->addChild(new Fixed(Horizontal::right,Vertical::bottom,10,10,70,70,10,10));
+    c->addChild(new Margin(10,Limit(100,200)));
+    c->addChild(new Margin(10,Limit(100,200)));
+//    c->addChild(new Margin(10,Limit(50,100)));
+//    c->addChild(new Margin(10,Limit(100,300)));
 
-    //s->Add(s2);
-//    s->Add(new Fixed(0,0,150,60));
-//    s->Add(limit(50,50,100,80,new Margin(0)));
-//    s->Add(limit(50,50,120,80,new Margin(0)));
-    auto dy = new Dynamic();
-    dy->addChild(new Fixed(200,200));
-    dy->addChild(new Fixed(100,100));
-    s->Add(dy);
-    s->Add(limit(300,200,300,200,new Margin(10)));
-    s->Add(limit(300,200,300,200,new Margin(10)));
-    s->Add(limit(300,200,300,200,new Margin(10)));
-
-
-//    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));
-//    s->Add(limit(90,90,400,100,new Margin(0)));
-
-
-
-    window->setChild(s);
-
-
-//    auto e = new Extended(Horizontal::Left,Vertical::Top,10,10);
-//    e->child=new Fixed(300,300);
-//    e->id="heeeeeeeeeeeeere!";
-//    window->child=e;
-//    auto stack = limit(300,300,400,300,new Stack(Horizontal::Left,Vertical::Top,Direction::Horizontal));
-//
-//    auto g1 = new Grid(vector<int>{100,100,100});
-//    g1->setChild(1,1,new Fixed(100,100));
-//    stack->Add(g1);
-//    stack->Add(new Fixed(100,100));
-//    window->child=stack;
-
-//    auto container = new Extended(Vertical::Top, 10, 500);
-//    //auto grid= new Fixed(10,10,100,100);
-//    auto grid = new Grid(vector<int>{50,50,50},vector<float>{0.2,0.3,0.5});
-//    grid->setChild(0,1,2,2,a);
-//    grid->setChild(0,0,new Margin(10));
-//    grid->setChild(2,0,new Margin(10));
-//    container->child=grid;
-//    window->child=container;
-
-
-//    Fixed f(Fixed::Left+Fixed::Top,100,100);
-//    window.x.head=10;
-//    window.y.head=10;
-//    window.setLeft("asd");
-//    window.id="window";
-
-//    Grid grid(3,3);
-//    grid.x.head=100;
-//    grid.x.tail=50;
-//    grid.y.tail=50;
-//    grid.y.head=50;
-//    Widget w1,w2;
-//    w1.x.head=10;
-//    w1.x.tail=10;
-//    w1.y.head=10;
-//    w1.y.tail=10;
-//    w2.x.head=20;
-//    w2.x.tail=20;
-//    w2.y.head=20;
-//    w2.y.tail=20;
-//    grid.setChild(1,1,2,2,&w1);
-//    grid.setChild(0,0,3,2,&w2);
-//    grid.setChild(2,2,1,1,&w1);
-//    window.child=&grid;
-
-//    Widget child1,child2,center,filler;
-//    child1.x.head=20;
-//    child1.y.head=20;
-//    child1.x.tail=20;
-//    child1.y.tail=20;
-//    child1.x.limit.min=300;
-//    child1.y.limit.min=300;
-//    child1.x.limit.max=600;
-//    child1.y.limit.max=600;
-//    window.child=&child1;
-//
-//    child2.x.body=300;
-//    child2.y.body=300;
-//    child1.child=&child2;
-//
-//    center.x.extended=true;
-//    center.y.extended=true;
-//    child2.child=&center;
-
-
-
+//    c->addChild(new Margin(10,Limit(100,200)));
+//    c->addChild(new Margin(10,Limit(100,200)));
+//    c->addChild(new Margin(10,Limit(100,200)));
     // Register the window class.
     const wchar_t CLASS_NAME[]  = L"Sample Window Class";
     HINSTANCE hInstance = GetModuleHandle(0);
@@ -226,16 +98,17 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hwnd, &ps);
+            testHdc=hdc;
             LPRECT rect=new tagRECT();
             GetClientRect(hwnd,rect);
-            Fixed parent(0,0,(int)rect->right,(int)rect->bottom);
-            parent.region.x=0;
-            parent.region.y=0;
-            parent.region.w=rect->right;
-            parent.region.h=rect->bottom;
-            parent.setChild(window);
-            window->calcuRegion(&parent);
-            window->render(hdc);
+            Layout::Region anchor;
+            anchor.l=0;
+            anchor.t=0;
+            anchor.w=rect->right;
+            anchor.h=rect->bottom;
+            anchor.r=anchor.w;
+            anchor.b=anchor.h;
+            window->calcuRegion(anchor);
             EndPaint(hwnd, &ps);
         }
             return 0;
