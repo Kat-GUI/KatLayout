@@ -151,7 +151,7 @@ public:
 
 class Dynamic:public Layout {
     std::list<std::shared_ptr<Layout>> childs;
-    int minH,minW,maxH,maxW;
+    int minH=std::numeric_limits<int>::max(),minW=std::numeric_limits<int>::max(),maxH,maxW;
 public:
     Dynamic &addChild(Layout *layout) {
         minH=std::min(minH,layout->getBoxMaxHeight());
@@ -178,8 +178,8 @@ public:
                 rank.insert(std::make_pair(anchor.w - c->getBoxMinWidth()+anchor.h-c->getBoxMinHeight(), c));
 
         for (auto r:rank) {
+            child = r.second;
             if (r.first > -1 && r.second->getBoxMinWidth() <= anchor.w && r.second->getBoxMinHeight() <= anchor.h) {
-                child = r.second;
                 break;
             }
         }
@@ -238,7 +238,12 @@ public:
             region.w=std::min(childs[i]->getBoxMinWidth()+ext,childs[i]->getBoxMaxWidth());
             region.r=region.l+region.w;
             childs[i]->calcuRegion(region);
-            region.l+=childs[i]->getBoxWidth();
+            int realW = childs[i]->getBoxWidth();
+            region.l+=realW;
+            if(region.w>realW) {
+                extSum -= extWidth[i];
+                restSpace -= (realW - childs[i]->getBoxMinWidth());
+            }
         }
 
 //        std::vector<int> extWidth;
