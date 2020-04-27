@@ -13,9 +13,12 @@
 #include<map>
 #include<algorithm>
 #include<memory>
+#include<assert.h>
 //#include"../cpp_DOM/src/DOM.h"
 #include<windows.h>
 HDC testHdc;
+
+
 class Layout{
 protected:
     std::shared_ptr<Layout> child;
@@ -55,6 +58,14 @@ public:
         return val;
     }
 };
+void draw(Layout::Region region){
+    RECT r;
+    r.left=region.l;
+    r.top=region.t;
+    r.right=region.r;
+    r.bottom=region.b;
+    FrameRect(testHdc,&r,CreateSolidBrush(RGB(0,0,0)));
+}
 const Limit Limit::none;
 class Margin:public Layout{
     int l,t,r,b;
@@ -80,7 +91,7 @@ public:
         region.b-=adjustH;
         region.w=region.r-region.l;
         region.h=region.b-region.t;
-        Rectangle(testHdc,region.l,region.t,region.r,region.b);
+        draw(region);
         if(child)child->calcuRegion(region);
     }
 
@@ -137,7 +148,7 @@ public:
                 region.b=anchor.b - (anchor.h-h)/2;
         }
         if(child)child->calcuRegion(region);
-        Rectangle(testHdc,region.l,region.t,region.r,region.b);
+        draw(region);
     }
     virtual int getBoxMinWidth()override{return l + w + r;}
     virtual int getBoxMaxWidth()override{return l + w + r;}
@@ -192,7 +203,7 @@ public:
             region.b = region.t + region.h;
         }
 
-        Rectangle(testHdc,region.l,region.t,region.r,region.b);
+        draw(region);
         if(child)child->calcuRegion(region);
 
     }
@@ -221,12 +232,11 @@ public:
     virtual void calcuRegion(Region anchor)override{
         Layout::inColumn=true;
         std::vector<float> extWidth;
-        float extSum=0,restSpace=anchor.w,fix=0,extCount=0;
+        float extSum=0,restSpace=anchor.w,fix=0,floating=0;
         for(auto c:childs){
             restSpace-=c->getBoxMinWidth();
             extWidth.push_back(c->getBoxMaxWidth()-c->getBoxMinWidth());
             extSum+=extWidth.back();
-            if(c->extendableInWidth())extCount++;
         }
         region.l=anchor.l;
         region.t=anchor.t;
@@ -240,54 +250,233 @@ public:
             childs[i]->calcuRegion(region);
             int realW = childs[i]->getBoxWidth();
             region.l+=realW;
+            floating+=realW;
             if(region.w>realW) {
                 extSum -= extWidth[i];
                 restSpace -= (realW - childs[i]->getBoxMinWidth());
             }
         }
-
-//        std::vector<int> extWidth;
-//        int extSum=0;
-//        int extCount=0,restSpace=anchor.w;
-//        for(auto c:childs)
-//        {
-//            restSpace-=c->getBoxMinWidth();
-//            extWidth.push_back(c->getBoxMinWidth()-c->getBoxMaxWidth());
-//            extSum+=extWidth.back();
-//            if(c->extendableInWidth())extCount++;
-//        }
-//        region.l=anchor.l;
-//        region.t=anchor.t;
-//        region.h=h;
-//        region.b=region.l+h;
-//        int unitSpace;
-//        for(int i=0;i<childs.size();i++){
-//            if(childs[i]->extendableInWidth())unitSpace = (--extCount)!=0 ? restSpace*(float)extWidth[i]/(float)extSum:0;
-//            if(unitSpace<0)unitSpace=0;
-//            if(childs[i]->extendableInWidth())
-//                region.w=std::min(childs[i]->getBoxMinWidth() + unitSpace,childs[i]->getBoxMaxWidth());
-//            else
-//                region.w=childs[i]->getBoxMinWidth();
-//            region.r=region.l + region.w;
-//            childs[i]->calcuRegion(region);
-//            restSpace-=(childs[i]->getBoxWidth()-childs[i]->getBoxMinWidth());
-//            region.l+=childs[i]->getBoxWidth();
-//        }
-//        region.w=region.l-anchor.l;
-//        region.l=anchor.l;
-//        region.r=region.l+region.w;
-//        //Rectangle(testHdc,region.l,region.t,region.r,5);
+        region.l=anchor.l;
+        region.w=floating;
+        region.r=region.l+region.w;
         Layout::inColumn=false;
+        draw(region);
     }
-    virtual int getBoxMinWidth()override{return region.w;}
-    virtual int getBoxMaxWidth()override{return region.w;}
+    virtual int getBoxMinWidth()override{
+        int ans=0;
+        for(auto c:childs) ans+=c->getBoxMinWidth();
+        return ans;
+    }
+    virtual int getBoxMaxWidth()override{
+        int ans=0;
+        for(auto c:childs) ans+=c->getBoxMaxWidth();
+        return ans;
+    }
     virtual int getBoxMinHeight()override{return h;}
     virtual int getBoxMaxHeight()override{return h;}
     virtual bool extendableInWidth()override{return true;}
     virtual bool extendableInHeight()override{return false;}
-    virtual int getBoxWidth()override{return region.w;};
+    virtual int getBoxWidth()override{
+        int ans=0;
+        for(auto c:childs) ans+=c->getBoxWidth();
+        return ans;
+    };
     virtual int getBoxHeight()override{return region.h;}
 };
+
+class ExtendColumn:public Layout{
+    std::vector<std::shared_ptr<Layout>> childs;
+    int h=0;
+public:
+    ExtendColumn(int height):h(height){}
+    ExtendColumn& addChild(Layout* layout){
+        std::shared_ptr<Layout> tmp;
+        tmp.reset(layout);
+        childs.push_back(tmp);
+        return *this;
+    }
+    virtual void calcuRegion(Region anchor)override{
+        Layout::inColumn=true;
+        int floating=0;
+        region.l=anchor.l;
+        region.t=anchor.t;
+        region.h=h;
+        region.b=region.t+h;
+        for(auto c:childs){
+            region.w=c->getBoxMaxWidth();
+            floating+=region.w;
+            region.r=region.l+region.w;
+            c->calcuRegion(region);
+            region.l+=region.w;
+        }
+        region.l=anchor.l;
+        region.w=floating;
+        region.r=region.l+region.w;
+        draw(region);
+        Layout::inRow=false;
+    }
+    virtual int getBoxMinWidth()override{return getBoxMaxWidth();}
+    virtual int getBoxMaxWidth()override{
+        int ans=0;
+        for(auto c:childs) ans+=c->getBoxMaxWidth();
+        return ans;
+    }
+    virtual int getBoxMinHeight()override{return h;}
+    virtual int getBoxMaxHeight()override{return h;}
+    virtual bool extendableInWidth()override{return false;}
+    virtual bool extendableInHeight()override{return false;}
+    virtual int getBoxWidth()override{return getBoxMaxWidth();};
+    virtual int getBoxHeight()override{return region.h;}
+};
+
+//TODO 增加ExtendGrid
+class Grid:public Layout{
+protected:
+    struct Container{
+        int x,y,spanX,spanY;
+        std::shared_ptr<Layout> layout;
+    };
+    enum divideMode{count,scale}mode=count;
+    std::vector<float> xScale,yScale;
+    int rowCount,colCount;
+    std::vector<Container> content;
+    std::vector<std::vector<int>> table;
+    bool rangeHit(const int& hit,const int& lbound,const int& ubound){
+        return hit>=lbound && hit<=ubound;
+    }
+public:
+    Grid(int rowCount,int colCount):colCount(colCount),rowCount(rowCount){
+        table.resize(rowCount);
+        for(std::vector<int>& line:table)line.resize(colCount,-1);
+    }
+    Grid(std::initializer_list<float> rows,std::initializer_list<float> columns)
+        :Grid(rows.size(),rows.size()){
+        xScale.push_back(0);
+        float sum=0;
+        for(float factor:columns){
+            sum+=factor;
+            xScale.push_back(sum);
+        }
+        sum=0;
+        yScale.push_back(0);
+        for(float factor:rows){
+            sum+=factor;
+            yScale.push_back(sum);
+        }
+        mode=scale;
+    }
+    Grid& addChild(int row,int col,int spanRow,int spanCol,Layout* layout){
+        if(!(rangeHit(row,0,rowCount) && rangeHit(col,0,colCount) &&
+        rangeHit(row+spanRow,0,rowCount) && rangeHit(col+spanCol,0,colCount)))
+            throw "目标行列超出可用范围";
+        Container container;
+        container.layout.reset(layout);
+        container.x=col;
+        container.y=row;
+        container.spanX=spanCol;
+        container.spanY=spanRow;
+        content.push_back(container);
+        for(int y=row;y<row+spanRow;y++){
+            for(int x=col;x<col+spanCol;x++){
+                if(table[y][x]!=-1&&content[table[y][x]].layout)content[table[y][x]].layout.reset();
+                table[y][x]=content.size()-1;
+            }
+        }
+
+    }
+    Grid& addChild(int row,int col,Layout* layout){
+        return addChild(row,col,1,1,layout);
+    }
+    //TODO 完成这几个函数覆写
+    virtual void calcuRegion(Region anchor)override{
+        Region subAnchor;
+        if(mode==count) {
+            int unitX = anchor.w / colCount;
+            int unitY = anchor.h / rowCount;
+            for (auto container:content) {
+                if (!container.layout)continue;
+                subAnchor.l = anchor.l + unitX * container.x;
+                subAnchor.t = anchor.l + unitY * container.y;
+                subAnchor.w = unitX * container.spanX;
+                subAnchor.h = unitY * container.spanY;
+                subAnchor.r = subAnchor.l + subAnchor.w;
+                subAnchor.b = subAnchor.t + subAnchor.h;
+                container.layout->calcuRegion(subAnchor);
+            }
+        }
+        else{
+            for(auto container:content){
+                if(!container.layout)continue;
+                subAnchor.l = anchor.l + anchor.w * xScale[container.x];
+                subAnchor.t = anchor.t + anchor.h * yScale[container.y];
+                subAnchor.r = anchor.l + anchor.w * xScale[container.x+container.spanX];
+                subAnchor.b = anchor.t + anchor.h * yScale[container.y+container.spanY];
+                subAnchor.w = subAnchor.r - subAnchor.l;
+                subAnchor.h = subAnchor.b - subAnchor.t;
+                container.layout->calcuRegion(subAnchor);
+            }
+        }
+        region=anchor;
+    }
+    virtual int getBoxMinWidth()override{return 0;}
+    virtual int getBoxMaxWidth()override{return 0;}
+    virtual int getBoxMinHeight()override{return 0;}
+    virtual int getBoxMaxHeight()override{return 0;}
+    virtual bool extendableInWidth()override{return true;}
+    virtual bool extendableInHeight()override{return true;}
+    virtual int getBoxWidth()override{return 0;};
+    virtual int getBoxHeight()override{return 0;}
+};
+//
+//class ExtendGrid:public Grid{
+//public:
+//    ExtendGrid(int rowCount,int colCount):Grid(rowCount,colCount){}
+//    Grid& addChild(int row,int col,int spanRow,int spanCol,Layout* layout){
+//        if(rangeHit(row,0,rowCount) && rangeHit(col,0,colCount) &&
+//           rangeHit(row+spanRow,0,rowCount) && rangeHit(col+spanCol,0,colCount))
+//            throw "目标行列超出可用范围";
+//        Container container;
+//        container.layout.reset(layout);
+//        container.x=col;
+//        container.y=row;
+//        container.spanX=spanCol;
+//        container.spanY=spanRow;
+//        content.push_back(container);
+//        for(int y=row;y<row+spanRow;y++){
+//            for(int x=col;x<col+spanCol;x++){
+//                if(content[table[y][x]].layout)content[table[y][x]].layout.reset();
+//                table[y][x]=content.size()-1;
+//            }
+//        }
+//
+//    }
+//    Grid& addChild(int row,int col,Layout* layout){
+//        return addChild(row,col,1,1,layout);
+//    }
+//    virtual void calcuRegion(Region anchor)override{
+//        Region subAnchor;
+//        int unitX = anchor.w/colCount;
+//        int unitY = anchor.h/rowCount;
+//        for(auto container:content){
+//            if(!container.layout)continue;
+//            subAnchor.l = anchor.l + unitX * container.x;
+//            subAnchor.t = anchor.l + unitY * container.y;
+//            subAnchor.w = unitX * container.spanX;
+//            subAnchor.h = unitY * container.spanY;
+//            subAnchor.r = subAnchor.l+subAnchor.w;
+//            subAnchor.b = subAnchor.t+subAnchor.h;
+//            container.layout->calcuRegion(subAnchor);
+//        }
+//    }
+//    virtual int getBoxMinWidth()override{return 0;}
+//    virtual int getBoxMaxWidth()override{return 0;}
+//    virtual int getBoxMinHeight()override{return 0;}
+//    virtual int getBoxMaxHeight()override{return 0;}
+//    virtual bool extendableInWidth()override{return true;}
+//    virtual bool extendableInHeight()override{return true;}
+//    virtual int getBoxWidth()override{return 0;};
+//    virtual int getBoxHeight()override{return 0;}
+//};
 
 //class Layout{
 //protected:

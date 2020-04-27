@@ -16,24 +16,50 @@ using namespace std;
 int main()
 {
     window=new Margin(10);
-    auto m = new Margin(10);
-    window->setChild(m);
-    auto c = new Column(100);
-    auto d = new Dynamic();
-    d->addChild(new Margin(10,Limit(90,350)));
-    d->addChild(new Fixed(80,80));
-    d->addChild(new Fixed(30,80));
-    auto d2 = new Dynamic();
-    d2->addChild(new Margin(10,Limit(90,350)));
-    d2->addChild(new Fixed(80,80));
-    d2->addChild(new Fixed(30,80));
-    m->setChild(c);
-    c->addChild(d);
-    c->addChild(d2);
-    c->addChild(new Fixed(Horizontal::right,Vertical::bottom,10,10,70,70,10,10));
-    c->addChild(new Margin(10,Limit(100,200)));
-    c->addChild(new Margin(10,Limit(100,200)));
-//    c->addChild(new Margin(10,Limit(50,100)));
+    auto g = new Grid({0.5,0.25,0.15,0.1},{0.5,0.25,0.15,0.1});
+    window->setChild(g);
+    g->addChild(0,0,new Margin(10));
+    g->addChild(1,2,2,2,new Margin(10));
+//    auto m = new Margin(10);
+//    window->setChild(m);
+//    auto c = new ExtendColumn(100);
+//
+//    auto c2=new Column(100);
+//    c2->addChild(new Fixed(Horizontal::right,Vertical::bottom,10,10,70,70,10,10));
+//    c2->addChild(new Margin(10,Limit(100,150)));
+//
+//
+//    auto d = new Dynamic();
+//    d->addChild(new Margin(10,Limit(90,150)));
+//    d->addChild(new Fixed(80,80));
+//    d->addChild(new Fixed(30,80));
+//
+//    auto d2 = new Dynamic();
+//    d2->addChild(new Margin(10,Limit(90,120)));
+//    d2->addChild(new Fixed(80,80));
+//    d2->addChild(new Fixed(30,80));
+//    c->addChild(d);
+//    c->addChild(d2);
+//
+//    auto d3 = new Dynamic();
+//    d3->addChild(new Margin(10,Limit(90,150)));
+//    d3->addChild(new Fixed(80,80));
+//    d3->addChild(new Fixed(30,80));
+//
+//    auto d4 = new Dynamic();
+//    d4->addChild(new Margin(10,Limit(90,120)));
+//    d4->addChild(new Fixed(80,80));
+//    d4->addChild(new Fixed(30,80));
+//    c2->addChild(d3);
+//    c2->addChild(d4);
+//    c->addChild(c2);
+//
+//    m->setChild(c);
+//
+//    c->addChild(new Fixed(Horizontal::right,Vertical::bottom,10,10,70,70,10,10));
+//    c->addChild(new Margin(10,Limit(100,150)));
+
+    //    c->addChild(new Margin(10,Limit(50,100)));
 //    c->addChild(new Margin(10,Limit(100,300)));
 
 //    c->addChild(new Margin(10,Limit(100,200)));
