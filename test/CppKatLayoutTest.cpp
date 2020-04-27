@@ -16,10 +16,23 @@ using namespace std;
 int main()
 {
     window=new Margin(10);
-    auto g = new Grid({0.5,0.25,0.15,0.1},{0.5,0.25,0.15,0.1});
-    window->setChild(g);
-    g->addChild(0,0,new Margin(10));
-    g->addChild(1,2,2,2,new Margin(10));
+    auto w = new WarpPanel(Direction::Vertical);
+    w->addChild(new Fixed(200,100));
+    w->addChild(new Fixed(200,100));
+    w->addChild(new Fixed(200,100));
+    w->addChild(new Fixed(200,100));
+    w->addChild(new Fixed(200,100));
+    w->addChild(new Fixed(200,100));
+    w->addChild(new Fixed(200,100));
+    w->addChild(new Fixed(200,100));
+    w->addChild(new Fixed(200,100));
+    w->addChild(new Fixed(200,100));w->addChild(new Fixed(200,100));
+
+    window->setChild(w);
+//    auto g = new Grid({0.5,0.25,0.15,0.1},{0.5,0.25,0.15,0.1});
+//    window->setChild(g);
+//    g->addChild(0,0,new Margin(10));
+//    g->addChild(1,2,2,2,new Margin(10));
 //    auto m = new Margin(10);
 //    window->setChild(m);
 //    auto c = new ExtendColumn(100);

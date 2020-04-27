@@ -442,11 +442,80 @@ public:
     virtual int getBoxHeight()override{return getBoxMaxHeight();}
 };
 
+enum class Direction{Horizontal,Vertical};
 class WarpPanel:public Layout{
-
+    std::vector<std::shared_ptr<Layout>> childs;
+    int minW = std::numeric_limits<int>::max(),sumW=0,minH=std::numeric_limits<int>::max(),sumH=0;
+    Direction direction;
+//    void calcuBound(){
+//
+//    }
+public:
+    WarpPanel(Direction floating=Direction::Horizontal):direction(floating){}
+    WarpPanel& addChild(Layout* layout){
+        std::shared_ptr<Layout> child;
+        child.reset(layout);
+        childs.push_back(child);
+        int w = child->getBoxMinWidth();
+        int h = child->getBoxMaxHeight();
+        minW=std::min(minW,w);
+        minH=std::min(minH,h);
+        sumW+=w;
+        sumH+=h;
+        return *this;
+    }
+    virtual void calcuRegion(Region anchor)override{
+        Region subAnchor;
+        int maxStacking=0;
+        if(direction==Direction::Horizontal){
+            subAnchor.l=anchor.l;
+            subAnchor.t=anchor.t;
+            for(auto iter=childs.begin();iter!=childs.end();iter++){
+                subAnchor.w=(*iter)->getBoxMinWidth();
+                subAnchor.h=(*iter)->getBoxMinHeight();
+                if(subAnchor.l+subAnchor.w > anchor.r){
+                    subAnchor.t+=maxStacking;
+                    maxStacking=0;
+                    subAnchor.l=anchor.l;
+                }
+                maxStacking=std::max(maxStacking,subAnchor.h);
+                subAnchor.r=subAnchor.l+subAnchor.w;
+                subAnchor.b=subAnchor.t+subAnchor.h;
+                (*iter)->calcuRegion(subAnchor);
+                subAnchor.l += subAnchor.w;
+            }
+        }
+        else{
+            subAnchor.l=anchor.l;
+            subAnchor.t=anchor.t;
+            for(auto iter=childs.begin();iter!=childs.end();iter++){
+                subAnchor.w=(*iter)->getBoxMinWidth();
+                subAnchor.h=(*iter)->getBoxMinHeight();
+                if(subAnchor.t+subAnchor.h > anchor.b){
+                    subAnchor.l+=maxStacking;
+                    maxStacking=0;
+                    subAnchor.t=anchor.t;
+                }
+                maxStacking=std::max(maxStacking,subAnchor.w);
+                subAnchor.r=subAnchor.l+subAnchor.w;
+                subAnchor.b=subAnchor.t+subAnchor.h;
+                (*iter)->calcuRegion(subAnchor);
+                subAnchor.t += subAnchor.h;
+            }
+        }
+    }
+    virtual int getBoxMinWidth()override{return minW;}
+    virtual int getBoxMaxWidth()override{return sumW;}
+    virtual int getBoxMinHeight()override{return minH;}
+    virtual int getBoxMaxHeight()override{return sumH;}
+    virtual bool extendableInWidth()override{return true;}
+    virtual bool extendableInHeight()override{return false;}
+    virtual int getBoxWidth()override{return region.w;};
+    virtual int getBoxHeight()override{return region.h;}
 };
 
 //TODO 增加ExtendGrid
+//TODO 增加Unit序列构造函数
 class Grid:public Layout{
 protected:
     struct Container{
