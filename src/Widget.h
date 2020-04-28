@@ -173,6 +173,7 @@ public:
     virtual int getBoxHeight()override{return t+h+b;}
 };
 
+//TODO 测试Ratio
 class Ratio:public Layout{
     std::shared_ptr<Layout> child;
     float heightRatio, widthRatio;//divide height by width
@@ -419,8 +420,7 @@ public:
     virtual int getBoxHeight()override{return region.h;}
 };
 
-//TODO 增加"挤压出子组件到另一个组件中"的功能
-//TODO 测试以下两个类
+//TODO 测试Column
 class Column:public AppendableLayout{
     int w=0;
     std::map<Layout*,bool> squeezeFlag;
@@ -504,7 +504,7 @@ public:
     };
     virtual int getBoxWidth()override{return region.w;}
 };
-
+//TODO 测试ExtendColumn
 class ExtendColumn:public AppendableLayout{
     int w=0;
     std::map<Layout*,bool> squeezeFlag;
@@ -639,7 +639,7 @@ public:
     virtual int getBoxHeight()override{return region.h;}
 };
 
-class Stack:public Layout{
+class Stack:public AppendableLayout{
     std::list<std::shared_ptr<Layout>> childs;
 public:
     Stack(){}
@@ -684,15 +684,14 @@ public:
 };
 
 //TODO 增加ExtendGrid
-//TODO 增加Unit序列构造函数
 class Grid:public Layout{
 protected:
     struct Container{
         int x,y,spanX,spanY;
         std::shared_ptr<Layout> layout;
     };
-    enum divideMode{count,scale}mode=count;
-    std::vector<float> xScale,yScale;
+    enum divideMode{count,scale,unit}mode=count;
+    std::vector<float> xUnit,yUnit;
     int rowCount,colCount;
     std::vector<Container> content;
     std::vector<std::vector<int>> table;
@@ -705,20 +704,20 @@ public:
         for(std::vector<int>& line:table)line.resize(colCount,-1);
     }
     Grid(std::initializer_list<float> rows,std::initializer_list<float> columns)
-        :Grid(rows.size(),rows.size()){
-        xScale.push_back(0);
-        float sum=0;
-        for(float factor:columns){
-            sum+=factor;
-            xScale.push_back(sum);
-        }
-        sum=0;
-        yScale.push_back(0);
-        for(float factor:rows){
-            sum+=factor;
-            yScale.push_back(sum);
-        }
+        :Grid(rows.size(),columns.size()){
+        xUnit.push_back(0);
+        yUnit.push_back(0);
+        for(float factor:columns)xUnit.push_back(factor+xUnit.back());
+        for(float factor:rows) yUnit.push_back(factor+yUnit.back());
         mode=scale;
+    }
+    Grid(std::initializer_list<int> rows,std::initializer_list<int> columns)
+        :Grid(rows.size(),columns.size()){
+        xUnit.push_back(0);
+        yUnit.push_back(0);
+        for(int r:rows) xUnit.push_back(r+xUnit.back());
+        for(int c:columns) yUnit.push_back(c+yUnit.back());
+        mode=unit;
     }
     Grid& addChild(int row,int col,int spanRow,int spanCol,Layout* layout){
         if(!(rangeHit(row,0,rowCount) && rangeHit(col,0,colCount) &&
@@ -742,7 +741,7 @@ public:
     Grid& addChild(int row,int col,Layout* layout){
         return addChild(row,col,1,1,layout);
     }
-    //TODO 完成这几个函数覆写
+
     virtual void calcuRegion(Region anchor)override{
         Region subAnchor;
         if(mode==count) {
@@ -758,29 +757,108 @@ public:
                 subAnchor.b = subAnchor.t + subAnchor.h;
                 container.layout->calcuRegion(subAnchor);
             }
+            region=anchor;
         }
-        else{
+        else if(mode==scale){
             for(auto container:content){
                 if(!container.layout)continue;
-                subAnchor.l = anchor.l + anchor.w * xScale[container.x];
-                subAnchor.t = anchor.t + anchor.h * yScale[container.y];
-                subAnchor.r = anchor.l + anchor.w * xScale[container.x+container.spanX];
-                subAnchor.b = anchor.t + anchor.h * yScale[container.y+container.spanY];
+                subAnchor.l = anchor.l + anchor.w * xUnit[container.x];
+                subAnchor.t = anchor.t + anchor.h * yUnit[container.y];
+                subAnchor.r = anchor.l + anchor.w * xUnit[container.x + container.spanX];
+                subAnchor.b = anchor.t + anchor.h * yUnit[container.y + container.spanY];
                 subAnchor.w = subAnchor.r - subAnchor.l;
                 subAnchor.h = subAnchor.b - subAnchor.t;
                 container.layout->calcuRegion(subAnchor);
             }
+            region=anchor;
         }
-        region=anchor;
+        else{ //TODO 测试Grid unitMode
+            for(auto container:content){
+                if(!container.layout)continue;
+                subAnchor.l = anchor.l + xUnit[container.x];
+                subAnchor.t = anchor.t + yUnit[container.y];
+                subAnchor.r = anchor.l + xUnit[container.x+1];
+                subAnchor.b = anchor.t + yUnit[container.y+1];
+                subAnchor.w = subAnchor.r - subAnchor.l;
+                subAnchor.h = subAnchor.b - subAnchor.t;
+                container.layout->calcuRegion(subAnchor);
+            }
+            region.l=anchor.l;
+            region.t=anchor.t;
+            region.w=xUnit.back();
+            region.h=yUnit.back();
+            region.r=region.l+region.w;
+            region.b=region.t+region.h;
+        }
+        draw(region);
     }
-    virtual int getBoxMinWidth()override{return 0;}
-    virtual int getBoxMaxWidth()override{return 0;}
-    virtual int getBoxMinHeight()override{return 0;}
-    virtual int getBoxMaxHeight()override{return 0;}
-    virtual bool extendableInWidth()override{return true;}
-    virtual bool extendableInHeight()override{return true;}
-    virtual int getBoxWidth()override{return 0;};
-    virtual int getBoxHeight()override{return 0;}
+    //TODO 测试这几个接口
+    virtual int getBoxMinWidth()override{
+        if(mode==unit)return xUnit.back();
+        int ans = 0;
+        Layout* prvLayout;
+        for(std::vector<int> line:table){
+            int lineWidth=0;
+            for(int index:line){
+                if(prvLayout==content[index].layout.get())continue;
+                prvLayout=content[index].layout.get();
+                lineWidth+=content[index].layout->getBoxMinWidth();
+            }
+            ans = std::max(ans,lineWidth);
+        }
+        return ans;
+    }
+    virtual int getBoxMaxWidth()override{
+        if(mode==unit)return xUnit.back();
+        int ans = 0;
+        Layout* prvLayout;
+        for(std::vector<int> line:table){
+            int lineWidth=0;
+            for(int index:line){
+                if(prvLayout==content[index].layout.get())continue;
+                prvLayout=content[index].layout.get();
+                lineWidth+=content[index].layout->getBoxMaxWidth();
+            }
+            ans = std::max(ans,lineWidth);
+        }
+        return ans;
+    }
+    virtual int getBoxMinHeight()override{
+        if(mode==unit)return yUnit.back();
+        int ans = 0;
+        Layout* prvLayout;
+        for(int x=0;x<colCount;x++){
+            int colHeight=0;
+            for(int y=0;y<rowCount;y++){
+                int index = table[y][x];
+                if(prvLayout==content[index].layout.get())continue;
+                prvLayout=content[index].layout.get();
+                colHeight+=content[index].layout->getBoxMinHeight();
+            }
+            ans = std::max(ans,colHeight);
+        }
+        return ans;
+    }
+    virtual int getBoxMaxHeight()override{
+        if(mode==unit)return yUnit.back();
+        int ans = 0;
+        Layout* prvLayout;
+        for(int x=0;x<colCount;x++){
+            int colHeight=0;
+            for(int y=0;y<rowCount;y++){
+                int index = table[y][x];
+                if(prvLayout==content[index].layout.get())continue;
+                prvLayout=content[index].layout.get();
+                colHeight+=content[index].layout->getBoxMaxHeight();
+            }
+            ans = std::max(ans,colHeight);
+        }
+        return ans;
+    }
+    virtual bool extendableInWidth()override{return mode!=unit;}
+    virtual bool extendableInHeight()override{return mode!=unit;}
+    virtual int getBoxWidth()override{ return region.h; };
+    virtual int getBoxHeight()override{ return region.w; }
 };
 //
 //class ExtendGrid:public Grid{
