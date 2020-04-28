@@ -514,6 +514,47 @@ public:
     virtual int getBoxHeight()override{return region.h;}
 };
 
+class Stack:public Layout{
+    std::list<std::shared_ptr<Layout>> childs;
+public:
+    Stack(){}
+    Stack& addChild(Layout* layout){
+        std::shared_ptr<Layout> child;
+        child.reset(layout);
+        childs.push_back(child);
+        return *this;
+    }
+    virtual void calcuRegion(Region anchor)override{
+        region=anchor;
+        for(auto c:childs)c->calcuRegion(anchor);
+        draw(region);
+    }
+    virtual int getBoxMinWidth()override{
+        int ans = std::numeric_limits<int>::max();
+        for(auto c:childs)ans = std::min(ans,c->getBoxMinWidth());
+        return ans;
+    }
+    virtual int getBoxMaxWidth()override{
+        int ans = std::numeric_limits<int>::min();
+        for(auto c:childs)ans = std::max(ans,c->getBoxMaxWidth());
+        return ans;
+    }
+    virtual int getBoxMinHeight()override{
+        int ans = std::numeric_limits<int>::max();
+        for(auto c:childs)ans = std::min(ans,c->getBoxMinHeight());
+        return ans;
+    }
+    virtual int getBoxMaxHeight()override{
+        int ans = std::numeric_limits<int>::min();
+        for(auto c:childs)ans = std::min(ans,c->getBoxMinHeight());
+        return ans;
+    }
+    virtual bool extendableInWidth()override{return true;}
+    virtual bool extendableInHeight()override{return true;}
+    virtual int getBoxWidth()override{return region.w;};
+    virtual int getBoxHeight()override{return region.h;}
+};
+
 //TODO 增加ExtendGrid
 //TODO 增加Unit序列构造函数
 class Grid:public Layout{
