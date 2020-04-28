@@ -15,20 +15,40 @@ using namespace std;
 
 int main()
 {
-    window=new Margin(10);
-    auto w = new WarpPanel(Direction::Vertical);
-    w->addChild(new Fixed(200,100));
-    w->addChild(new Fixed(200,100));
-    w->addChild(new Fixed(200,100));
-    w->addChild(new Fixed(200,100));
-    w->addChild(new Fixed(200,100));
-    w->addChild(new Fixed(200,100));
-    w->addChild(new Fixed(200,100));
-    w->addChild(new Fixed(200,100));
-    w->addChild(new Fixed(200,100));
-    w->addChild(new Fixed(200,100));w->addChild(new Fixed(200,100));
+    window=new Margin(100);
+    auto g = new Grid(2,1);
+    auto r2 = new Row(100);
+    auto r = new Row(100);
+    r->addChild(new Fixed(100,100));
+    r->addChild(new Fixed(100,100));
+    r->addChild(new Fixed(100,100));
+    r->addChild(new Fixed(100,100));
+    r->addChild(new Fixed(100,100));
+    r->squeezeBack=[&](std::shared_ptr<Layout> layout){
+        r2->removeChild(layout);
+        std::cout<<"out"<<std::endl;
+    };
+    r->squeezeOut=[&](LayoutPtr layout){
+        r2->addChild(layout);
+        std::cout<<"back"<<std::endl;
+    };
+    g->addChild(0,0,r);
+    g->addChild(1,0,r2);
+    window->setChild(g);
+//    auto w = new WarpPanel(Direction::Vertical);
+//    w->addChild(new Fixed(200,100));
+//    w->addChild(new Fixed(200,100));
+//    w->addChild(new Fixed(200,100));
+//    w->addChild(new Fixed(200,100));
+//    w->addChild(new Fixed(200,100));
+//    w->addChild(new Fixed(200,100));
+//    w->addChild(new Fixed(200,100));
+//    w->addChild(new Fixed(200,100));
+//    w->addChild(new Fixed(200,100));
+//    w->addChild(new Fixed(200,100));
+//    w->addChild(new Fixed(200,100));
+//    window->setChild(w);
 
-    window->setChild(w);
 //    auto g = new Grid({0.5,0.25,0.15,0.1},{0.5,0.25,0.15,0.1});
 //    window->setChild(g);
 //    g->addChild(0,0,new Margin(10));

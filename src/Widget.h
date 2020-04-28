@@ -18,10 +18,7 @@
 #include<windows.h>
 HDC testHdc;
 
-
 class Layout{
-protected:
-    std::shared_ptr<Layout> child;
 public:
     struct Region{int l,t,w,h,r,b;};
     virtual void calcuRegion(Region anchor)=0;
@@ -41,9 +38,22 @@ public:
     static bool inRow;
 protected:
     Region region;
+    std::shared_ptr<Layout> child;
+};
+using LayoutPtr = std::shared_ptr<Layout>;
+class AppendableLayout:public Layout{
+protected:
+    std::list<std::shared_ptr<Layout>> childs;
+public:
+    int empty(){return childs.empty();}
+    virtual AppendableLayout& addChild(LayoutPtr layout)=0;
+    virtual AppendableLayout& removeChild(LayoutPtr layout){
+        childs.remove(layout);
+    };
 };
 bool Layout::inColumn=false;
 bool Layout::inRow=false;
+
 class Limit{
 public:
     static const int Min=0;
@@ -58,6 +68,7 @@ public:
         return val;
     }
 };
+
 void draw(Layout::Region region){
     RECT r;
     r.left=region.l;
@@ -66,7 +77,9 @@ void draw(Layout::Region region){
     r.bottom=region.b;
     FrameRect(testHdc,&r,CreateSolidBrush(RGB(0,0,0)));
 }
+
 const Limit Limit::none;
+
 class Margin:public Layout{
     int l,t,r,b;
     Limit w,h;
@@ -258,19 +271,25 @@ public:
     virtual int getBoxHeight()override{return (bool)child ? child->getBoxHeight():minH;}
 };
 
-//TODO 增加"挤压出子组件到另一个组件中"的功能
-class Column:public Layout{
-    std::vector<std::shared_ptr<Layout>> childs;
+class Row:public AppendableLayout{
     int h=0;
+    std::map<Layout*,bool> squeezeFlag;
 public:
-    Column(int height):h(height){}
-    Column& addChild(Layout* layout){
+    std::function<void(std::shared_ptr<Layout>)> squeezeOut;
+    std::function<void(std::shared_ptr<Layout>)> squeezeBack;
+    Row(int height):h(height){}
+    Row& addChild(Layout* layout){
         std::shared_ptr<Layout> tmp;
         tmp.reset(layout);
         childs.push_back(tmp);
         return *this;
     }
-    virtual void calcuRegion(Region anchor)override{
+    virtual Row& addChild(LayoutPtr layout)override{
+        childs.push_back(layout);
+        squeezeFlag[layout.get()]=false;
+        return *this;
+    }
+    virtual void calcuRegion(Region anchor)override {
         Layout::inColumn=true;
         std::vector<float> extWidth;
         float extSum=0,restSpace=anchor.w,floating=0;
@@ -283,18 +302,31 @@ public:
         region.t=anchor.t;
         region.h=h;
         region.b=region.t+region.h;
-        for(int i=0;i<childs.size();i++){
+        int i=0;
+        for(auto iter=childs.begin();iter!=childs.end();i++,iter++){
+            //squeeze
+            if(region.l + (*iter)->getBoxMinWidth() >= anchor.r && squeezeOut) {
+                if(!squeezeFlag[iter->get()]) {
+                    squeezeFlag[iter->get()] = true;
+                    squeezeOut(*iter);
+                }
+                continue;
+            }else if(squeezeBack && squeezeFlag[iter->get()]) {
+                squeezeFlag[iter->get()]=false;
+                squeezeBack(*iter);
+            }
+
             int ext = restSpace*(extWidth[i])/extSum;
             if(ext<0)ext=0;
-            region.w=std::min(childs[i]->getBoxMinWidth()+ext,childs[i]->getBoxMaxWidth());
+            region.w=std::min((*iter)->getBoxMinWidth()+ext,(*iter)->getBoxMaxWidth());
             region.r=region.l+region.w;
-            childs[i]->calcuRegion(region);
-            int realW = childs[i]->getBoxWidth();
+            (*iter)->calcuRegion(region);
+            int realW = (*iter)->getBoxWidth();
             region.l+=realW;
             floating+=realW;
             if(region.w>realW) {
                 extSum -= extWidth[i];
-                restSpace -= (realW - childs[i]->getBoxMinWidth());
+                restSpace -= (realW - (*iter)->getBoxMinWidth());
             }
         }
         region.l=anchor.l;
@@ -325,15 +357,21 @@ public:
     virtual int getBoxHeight()override{return region.h;}
 };
 
-class ExtendColumn:public Layout{
-    std::vector<std::shared_ptr<Layout>> childs;
+class ExtendRow:public AppendableLayout{
     int h=0;
+    std::map<Layout*,bool> squeezeFlag;
 public:
-    ExtendColumn(int height):h(height){}
-    ExtendColumn& addChild(Layout* layout){
-        std::shared_ptr<Layout> tmp;
-        tmp.reset(layout);
-        childs.push_back(tmp);
+    std::function<void(std::shared_ptr<Layout>)> squeezeOut;
+    std::function<void(std::shared_ptr<Layout>)> squeezeBack;
+
+    ExtendRow(int height):h(height){}
+    ExtendRow& addChild(Layout* layout){
+        child.reset(layout);
+        return addChild(child);
+    }
+    ExtendRow& addChild(std::shared_ptr<Layout> layout){
+        childs.push_back(layout);
+        squeezeFlag[layout.get()]=false;
         return *this;
     }
     virtual void calcuRegion(Region anchor)override{
@@ -344,6 +382,17 @@ public:
         region.h=h;
         region.b=region.t+h;
         for(auto c:childs){
+            //squeeze
+            if(region.l + c->getBoxMinWidth() >= anchor.r && squeezeOut) {
+                if(!squeezeFlag[c.get()]) {
+                    squeezeFlag[c.get()] = true;
+                    squeezeOut(c);
+                }
+                continue;
+            }else if(squeezeBack && squeezeFlag[c.get()]) {
+                squeezeFlag[c.get()]=false;
+                squeezeBack(c);
+            }
             region.w=c->getBoxMaxWidth();
             floating+=region.w;
             region.r=region.l+region.w;
@@ -372,15 +421,21 @@ public:
 
 //TODO 增加"挤压出子组件到另一个组件中"的功能
 //TODO 测试以下两个类
-class Rows:public Layout{
-    std::vector<std::shared_ptr<Layout>> childs;
+class Column:public AppendableLayout{
     int w=0;
+    std::map<Layout*,bool> squeezeFlag;
 public:
-    Rows(int width):w(width){}
-    Rows& addChild(Layout* layout){
-        std::shared_ptr<Layout> tmp;
-        tmp.reset(layout);
-        childs.push_back(tmp);
+    std::function<void(std::shared_ptr<Layout>)> squeezeOut;
+    std::function<void(std::shared_ptr<Layout>)> squeezeBack;
+
+    Column(int width):w(width){}
+    Column& addChild(Layout* layout){
+        child.reset(layout);
+        return addChild(child);
+    }
+    virtual Column& addChild(LayoutPtr layout){
+        childs.push_back(layout);
+        squeezeFlag[layout.get()]=false;
         return *this;
     }
     virtual void calcuRegion(Region anchor)override{
@@ -396,18 +451,30 @@ public:
         region.t=anchor.t;
         region.w=w;
         region.r=region.l+region.w;
-        for(int i=0;i<childs.size();i++){
+        int i=0;
+        for(auto iter=childs.begin();iter!=childs.end();i++,iter++){
+            //squeeze
+            if(region.l + (*iter)->getBoxMinWidth() >= anchor.r && squeezeOut) {
+                if(!squeezeFlag[iter->get()]) {
+                    squeezeFlag[iter->get()] = true;
+                    squeezeOut(*iter);
+                }
+                continue;
+            }else if(squeezeBack && squeezeFlag[iter->get()]) {
+                squeezeFlag[iter->get()]=false;
+                squeezeBack(*iter);
+            }
             int ext = restSpace * extHeight[i]/extSum;
             if(ext<0)ext=0;
-            region.h=std::min(childs[i]->getBoxMinHeight()+ext,childs[i]->getBoxMaxHeight());
+            region.h=std::min((*iter)->getBoxMinHeight()+ext,(*iter)->getBoxMaxHeight());
             region.b=region.t+region.h;
-            childs[i]->calcuRegion(region);
-            int realH = childs[i]->getBoxHeight();
+            (*iter)->calcuRegion(region);
+            int realH = (*iter)->getBoxHeight();
             region.t+=realH;
             floating+=realH;
             if(region.h>realH) {
                 extSum -= extHeight[i];
-                restSpace -= (realH - childs[i]->getBoxMinHeight());
+                restSpace -= (realH - (*iter)->getBoxMinHeight());
             }
         }
         region.t=anchor.t;
@@ -438,15 +505,20 @@ public:
     virtual int getBoxWidth()override{return region.w;}
 };
 
-class ExtendRow:public Layout{
-    std::vector<std::shared_ptr<Layout>> childs;
+class ExtendColumn:public AppendableLayout{
     int w=0;
+    std::map<Layout*,bool> squeezeFlag;
 public:
-    ExtendRow(int width):w(width){}
-    ExtendRow& addChild(Layout* layout){
-        std::shared_ptr<Layout> tmp;
-        tmp.reset(layout);
-        childs.push_back(tmp);
+    std::function<void(std::shared_ptr<Layout>)> squeezeOut;
+    std::function<void(std::shared_ptr<Layout>)> squeezeBack;
+    ExtendColumn(int width):w(width){}
+    ExtendColumn& addChild(Layout* layout){
+        child.reset(layout);
+        return addChild(child);
+    }
+    ExtendColumn& addChild(std::shared_ptr<Layout> layout){
+        childs.push_back(layout);
+        squeezeFlag[layout.get()]=false;
         return *this;
     }
     virtual void calcuRegion(Region anchor)override{
@@ -457,6 +529,17 @@ public:
         region.w=w;
         region.r=region.l+w;
         for(auto c:childs){
+            //squeeze
+            if(region.l + c->getBoxMinWidth() >= anchor.r && squeezeOut) {
+                if(!squeezeFlag[c.get()]) {
+                    squeezeFlag[c.get()] = true;
+                    squeezeOut(c);
+                }
+                continue;
+            }else if(squeezeBack && squeezeFlag[c.get()]) {
+                squeezeFlag[c.get()]=false;
+                squeezeBack(c);
+            }
             region.h=c->getBoxMaxHeight();
             floating+=region.h;
             region.b=region.t+region.h;
@@ -484,8 +567,7 @@ public:
 };
 
 enum class Direction{Horizontal,Vertical};
-class WarpPanel:public Layout{
-    std::vector<std::shared_ptr<Layout>> childs;
+class WarpPanel:public AppendableLayout{
     int minW = std::numeric_limits<int>::max(),sumW=0,minH=std::numeric_limits<int>::max(),sumH=0;
     Direction direction;
 //    void calcuBound(){
@@ -494,11 +576,13 @@ class WarpPanel:public Layout{
 public:
     WarpPanel(Direction floating=Direction::Horizontal):direction(floating){}
     WarpPanel& addChild(Layout* layout){
-        std::shared_ptr<Layout> child;
         child.reset(layout);
-        childs.push_back(child);
-        int w = child->getBoxMinWidth();
-        int h = child->getBoxMaxHeight();
+        return addChild(child);
+    }
+    WarpPanel& addChild(std::shared_ptr<Layout> layout){
+        childs.push_back(layout);
+        int w = layout->getBoxMinWidth();
+        int h = layout->getBoxMaxHeight();
         minW=std::min(minW,w);
         minH=std::min(minH,h);
         sumW+=w;
@@ -562,6 +646,9 @@ public:
     Stack& addChild(Layout* layout){
         std::shared_ptr<Layout> child;
         child.reset(layout);
+        return addChild(child);
+    }
+    Stack& addChild(std::shared_ptr<Layout> layout){
         childs.push_back(child);
         return *this;
     }
@@ -975,7 +1062,6 @@ public:
 //        }
 //        begin+=parent_begin;
 //        end+=parent_begin;
-//        //TODO:安排整体缩放
 //    }
 //public:
 //    virtual void calcuRegion(Layout* container){
@@ -984,7 +1070,6 @@ public:
 //        calcuAxis(y,region.y,region.h,region.b,container->region.y,container->region.h);
 //	}
 //
-//	//TODO: 把这里set get都删掉
 //	//下面到undef之前都是烦人的口水代码
 //#define ASSERT static_assert(std::is_same<T,int>::value||std::is_same<T,float>::value||std::is_same<T,double>::value,"The template parameter must be int or float.")
 //	template<typename T>
@@ -1127,7 +1212,6 @@ public:
 //class Extended: public Widget{
 //    enum ExtendedMode{horizontal,vertical}extendedMode;
 //public:
-//    //TODO:把这里X Y统统去掉
 //    Extended()=default;
 //    template<typename X,typename T,typename B>
 //    Extended(Horizontal horizontalDock, X x, T top, B bottom){
@@ -1213,15 +1297,13 @@ public:
 //        }
 ////        y.extended=false;
 //    }
-//    //TODO:增加get/set Width Height,处理当使用Width/Height时getX getY返回不正确的结果的问题
+
 //    float getX(){ return x.head==Layout::empty ? x.tail : x.head; }
 //    float getY(){ return y.head==Layout::empty ? y.tail : y.head; }
 //
 //
 //    virtual bool expandable(Axis::Enum axis)override{
-////TODO expandable Extended
-//        return true;
-//    }
+
 //
 //};
 //class Fixed:public Extended{
@@ -1264,7 +1346,7 @@ public:
 //    }
 //
 //    virtual bool expandable(Axis::Enum axis)override{ return false; }
-//    //TODO:getChild function
+
 //};
 //
 //template<typename T>
@@ -1277,7 +1359,7 @@ public:
 //
 //
 //using displayCondition = std::function<bool(Size)>;
-////这个类不能为extended
+
 //class Dynamic:public Margin{
 //    bool isDefault=true;
 //    struct Candidate{
@@ -1502,7 +1584,7 @@ public:
 ////enum class AlignMode{Vertical,Horizontal,Unit};
 //enum class Direction{Horizontal,Vertical};
 //class Stack:public Extended{
-//    //TODO:弄一个“挤出”事件
+
 //    //AlignMode mMode;
 //    Direction mFloating;
 //    Horizontal hDock;
@@ -1641,12 +1723,6 @@ public:
 //    }
 //};
 //
-////TODO:将上面的类改成Grid<Fixed>形式
-////TODO:添加Grid<Extended>,该类setChild只接受Fixed和Extend类型
-////TODO:添加Grid<Margin>
-////TODO:Stack:Extend布局类 Stack<Fixed> Stack<Margin>
-//
-////TODO:考虑用Fixed Extended Margin 套 Grid Panel Stack的方式而非模板特化！
 
 
 
