@@ -160,6 +160,47 @@ public:
     virtual int getBoxHeight()override{return t+h+b;}
 };
 
+class Ratio:public Layout{
+    std::shared_ptr<Layout> child;
+    float heightRatio, widthRatio;//divide height by width
+public:
+    Ratio(float heightRatio,float widthRatio):heightRatio(heightRatio),widthRatio(widthRatio){}
+    void setChild(Layout* layout){
+        child.reset(layout);
+    }
+    virtual void calcuRegion(Region anchor)override {
+        int half;
+        if(anchor.w>anchor.h){
+            region.h=anchor.h;
+            region.w=(float)anchor.h/heightRatio * widthRatio;
+            region.t=anchor.t;
+            region.b=anchor.b;
+            half = (anchor.w-region.w)/2;
+            region.l=anchor.l+half;
+            region.r=region.l+region.w+half;
+        }
+        else{
+            region.w=anchor.w;
+            region.h=(float)anchor.w/widthRatio * heightRatio;
+            region.l=anchor.l;
+            region.r=anchor.r;
+            half = (anchor.h-region.h)/2;
+            region.t=anchor.t+half;
+            region.b=anchor.b+half;
+        }
+        draw(region);
+        child->calcuRegion(region);
+    }
+    virtual int getBoxMinWidth()override{return 0;}
+    virtual int getBoxMaxWidth()override{return 0;}
+    virtual int getBoxMinHeight()override{return 0;}
+    virtual int getBoxMaxHeight()override{return 0;}
+    virtual bool extendableInWidth()override{return true;}
+    virtual bool extendableInHeight()override{return true;}
+    virtual int getBoxWidth()override{return region.w;};
+    virtual int getBoxHeight()override{return region.h;}
+};
+
 class Dynamic:public Layout {
     std::list<std::shared_ptr<Layout>> childs;
     int minH=std::numeric_limits<int>::max(),minW=std::numeric_limits<int>::max(),maxH,maxW;
