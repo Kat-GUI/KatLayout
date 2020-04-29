@@ -18,8 +18,24 @@
 #include<windows.h>
 HDC testHdc;
 
+class Limit{
+public:
+    static const int Min=0;
+    static const int Max=std::numeric_limits<int>::max();
+    Limit():Limit(Min,Max){}
+    Limit(int min,int max):max(max),min(min){}
+    static const Limit none;
+    int min,max;
+    int get(int val){
+        if(max!=Limit::Max)val = std::min(val,max);
+        if(min!=Limit::Min)val = std::max(val,min);
+        return val;
+    }
+};
+
 class Layout{
 public:
+    Limit heightLimit,widthLimit;
     struct Region{int l,t,w,h,r,b;};
     virtual void calcuRegion(Region anchor)=0;
     virtual int getBoxMinWidth()=0;
@@ -54,20 +70,17 @@ public:
 bool Layout::inColumn=false;
 bool Layout::inRow=false;
 
-class Limit{
-public:
-    static const int Min=0;
-    static const int Max=std::numeric_limits<int>::max();
-    Limit():Limit(Min,Max){}
-    Limit(int min,int max):max(max),min(min){}
-    static const Limit none;
-    int min,max;
-    int get(int val){
-        if(max!=Limit::Max)val = std::min(val,max);
-        if(min!=Limit::Min)val = std::max(val,min);
-        return val;
-    }
-};
+LayoutPtr constraint(Limit width,Limit height,Layout* layout){
+    LayoutPtr tmp(layout);
+    tmp->widthLimit=width;
+    tmp->heightLimit=height;
+    return tmp;
+}
+LayoutPtr constraint(Limit width,Limit height,LayoutPtr layout){
+    layout->widthLimit=width;
+    layout->heightLimit=height;
+    return layout;
+}
 
 void draw(Layout::Region region){
     RECT r;
@@ -82,13 +95,13 @@ const Limit Limit::none;
 
 class Margin:public Layout{
     int l,t,r,b;
-    Limit w,h;
 public:
-    Margin(int left,int top,int right,int bottom,Limit width = Limit::none,Limit height = Limit::none){
-        l=left;t=top;r=right;b=bottom;w=width;h=height;
+    Margin(int left,int top,int right,int bottom){
+        l=left;t=top;r=right;b=bottom;
     }
-    Margin(int px,Limit width = Limit::none,Limit height = Limit::none):Margin(px,px,px,px,width,height){}
+    Margin(int px):Margin(px,px,px,px){}
     void setChild(Layout* layout){child.reset(layout);}
+    void setChild(LayoutPtr layout){child=layout;}
     virtual void calcuRegion(Region anchor)override{
         region.l=anchor.l+l;
         region.t=anchor.t+t;
@@ -96,8 +109,8 @@ public:
         region.b=anchor.b-b;
         region.w=region.r-region.l;
         region.h=region.b-region.t;
-        int adjustW = (region.w - w.get(region.w))/2;
-        int adjustH = (region.h - h.get(region.h))/2;
+        int adjustW = (region.w - widthLimit.get(region.w))/2;
+        int adjustH = (region.h - heightLimit.get(region.h))/2;
         region.l+=adjustW;
         region.r-=adjustW;
         region.t+=adjustH;
@@ -108,10 +121,10 @@ public:
         if(child)child->calcuRegion(region);
     }
 
-    virtual int getBoxMinWidth()override{return l + w.min + r;}
-    virtual int getBoxMaxWidth()override{return l + w.max + r;}
-    virtual int getBoxMinHeight()override{return r + h.min + b;}
-    virtual int getBoxMaxHeight()override{return t + h.max + b;}
+    virtual int getBoxMinWidth()override{return l + widthLimit.min + r;}
+    virtual int getBoxMaxWidth()override{return l + widthLimit.max + r;}
+    virtual int getBoxMinHeight()override{return r + heightLimit.min + b;}
+    virtual int getBoxMaxHeight()override{return t + heightLimit.max + b;}
     virtual bool extendableInWidth()override{return true;}
     virtual bool extendableInHeight()override{return true;}
     virtual int getBoxWidth()override{return l+region.w+r;};
@@ -126,53 +139,58 @@ class Fixed:public Layout{
     Horizontal xd;
     Vertical yd;
 public:
+    static const int infinity;
     Fixed(Horizontal xDock,Vertical yDock,int left,int top,int width,int height,int right,int bottom)
         :xd(xDock),yd(yDock),l(left),t(top),w(width),h(height),r(right),b(bottom){}
+    Fixed(int left,int top,int width,int height)
+        :Fixed(Horizontal::left,Vertical::top,left,top,width,height,0,0){}
     Fixed(int width,int height)
         :Fixed(Horizontal::center,Vertical::center,0,0,width,height,0,0){}
     void setChild(Layout* layout){child.reset(layout);}
     virtual void calcuRegion(Region anchor)override{
-        region.h=h;
-        region.w=w;
+        region.h=heightLimit.get(h==infinity ? anchor.h-t-b : h);
+        region.w=widthLimit.get(w==infinity ? anchor.w-l-r : w);
         switch(xd){
             case Horizontal::left:
                 region.l=anchor.l+l;
-                region.r=region.l+w;
+                region.r=region.l+region.w;
                 break;
             case Horizontal::right:
                 region.r=anchor.r-r;
-                region.l=region.r-w;
+                region.l=region.r-region.w;
                 break;
             case Horizontal::center:
-                region.l=anchor.l + (anchor.w-w)/2;
-                region.r=anchor.r - (anchor.w-w)/2;
+                region.l=anchor.l + (anchor.w-region.w)/2;
+                region.r=anchor.r - (anchor.w-region.w)/2;
         }
         switch(yd){
             case Vertical::top:
                 region.t=anchor.t+t;
-                region.b=region.t+h;
+                region.b=region.t+region.h;
                 break;
             case Vertical::bottom:
                 region.b=anchor.b-b;
-                region.t=region.b-h;
+                region.t=region.b-region.h;
                 break;
             case Vertical::center:
-                region.t=anchor.t + (anchor.h-h)/2;
-                region.b=anchor.b - (anchor.h-h)/2;
+                region.t=anchor.t + (anchor.h-region.h)/2;
+                region.b=anchor.b - (anchor.h-region.h)/2;
         }
         if(child)child->calcuRegion(region);
         draw(region);
     }
-    virtual int getBoxMinWidth()override{return l + w + r;}
-    virtual int getBoxMaxWidth()override{return l + w + r;}
-    virtual int getBoxMinHeight()override{return t + h + b;}
-    virtual int getBoxMaxHeight()override{return t + h + b;}
+    virtual int getBoxMinWidth()override{return l + region.w + r;}
+    virtual int getBoxMaxWidth()override{return l + region.w + r;}
+    virtual int getBoxMinHeight()override{return t + region.h + b;}
+    virtual int getBoxMaxHeight()override{return t + region.h + b;}
     virtual bool extendableInWidth()override{return false;}
     virtual bool extendableInHeight()override{return false;}
-    virtual int getBoxWidth()override{return l+w+r;};
-    virtual int getBoxHeight()override{return t+h+b;}
+    virtual int getBoxWidth()override{return l+region.w+r;};
+    virtual int getBoxHeight()override{return t+region.h+b;}
 };
+const int Fixed::infinity = std::numeric_limits<int>::max();
 
+//TODO 给以下四个类非扩展边添加自动贴合至父组件的功能
 //TODO 测试Ratio
 class Ratio:public Layout{
     std::shared_ptr<Layout> child;
