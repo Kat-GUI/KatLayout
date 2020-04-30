@@ -2,7 +2,7 @@
 #define UNICODE
 #endif
 #include <windows.h>
-#include"../src/Widget.h"
+#include"../src/Layout.h"
 #include<iostream>
 //using namespace DOM;
 Margin* window;
